@@ -1,6 +1,12 @@
-import unittest
+
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
+
+import os
+import unittest
+
+os.environ.setdefault("QAUTH_APP_ID", "test-app-id")
+os.environ.setdefault("QAUTH_PUBLIC_KEY", "test-public-key")
 
 from mcp.server.mcpserver.exceptions import ToolError
 
