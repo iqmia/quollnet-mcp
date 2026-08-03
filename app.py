@@ -1,4 +1,6 @@
 import os
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from mcp.server import MCPServer
 from starlette.applications import Starlette
@@ -25,18 +27,27 @@ async def server_status() -> dict[str, str]:
         "status": "ok",
     }
 
-mcp_http_app = mcp.streamable_http_app(
-    json_response=True,
-    stateless_http=True,
-)
 
 async def health(_: Request) -> JSONResponse:
     return JSONResponse(await server_status())
 
 
+mcp_http_app = mcp.streamable_http_app(
+    json_response=True,
+    stateless_http=True,
+)
+
+
+@asynccontextmanager
+async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
+    async with mcp.session_manager.run():
+        yield
+
+
 app = Starlette(
     routes=[
         Route("/health", health, methods=["GET"]),
-        Mount("/mcp", app=mcp.streamable_http_app()),
-    ]
+        Mount("/", app=mcp_http_app),
+    ],
+    lifespan=lifespan,
 )
