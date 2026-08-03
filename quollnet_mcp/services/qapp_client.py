@@ -57,3 +57,36 @@ class QAppClient:
             raise QAppClientError("qApp request failed") from error
         except ValueError as error:
             raise QAppClientError("qApp returned invalid JSON") from error
+
+    async def search_articles(
+        self,
+        *,
+        access_token: str,
+        q: str | None = None,
+        topic: str | None = None,
+        lang: str | None = None,
+        status: str | None = None,
+        sort_by: str | None = None,
+        sort_dir: str | None = None,
+        page: int | None = None,
+        per_page: int | None = None,
+    ) -> Any:
+        params: dict[str, Any] = {
+            "q": q,
+            "topic": topic,
+            "lang": lang,
+            "status": status,
+            "sort_by": sort_by,
+            "sort_dir": sort_dir,
+            "page": page,
+            "per_page": per_page,
+        }
+        for parameter in ("q", "topic", "lang"):
+            if params[parameter] is None:
+                del params[parameter]
+
+        return await self.get_json(
+            "/articles/api/v1/articles/catalog",
+            params=params,
+            access_token=access_token,
+        )
