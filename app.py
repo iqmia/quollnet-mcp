@@ -8,6 +8,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
+from quollnet_mcp.services.qapp_client import QAppClient
+
 
 SERVICE_NAME = os.getenv("QUOLLNET_SERVICE", "quollnet-mcp")
 SERVICE_VERSION = os.getenv("QUOLLNET_VERSION", "0.1.0")
@@ -40,8 +42,9 @@ mcp_http_app = mcp.streamable_http_app(
 
 @asynccontextmanager
 async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
-    async with mcp.session_manager.run():
-        yield
+    async with QAppClient() as qapp_client:
+        async with mcp.session_manager.run():
+            yield
 
 
 app = Starlette(
