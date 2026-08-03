@@ -71,19 +71,20 @@ class QAppClient:
         page: int | None = None,
         per_page: int | None = None,
     ) -> Any:
-        params: dict[str, Any] = {
-            "q": q,
-            "topic": topic,
-            "lang": lang,
-            "status": status,
-            "sort_by": sort_by,
-            "sort_dir": sort_dir,
-            "page": page,
-            "per_page": per_page,
+        params = {
+            name: value
+            for name, value in {
+                "q": q,
+                "topic": topic,
+                "lang": lang,
+                "status": status,
+                "sort_by": sort_by,
+                "sort_dir": sort_dir,
+                "page": page,
+                "per_page": per_page,
+            }.items()
+            if value is not None
         }
-        for parameter in ("q", "topic", "lang"):
-            if params[parameter] is None:
-                del params[parameter]
 
         return await self.get_json(
             "/articles/api/v1/articles/catalog",

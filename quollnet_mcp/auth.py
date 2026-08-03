@@ -26,7 +26,7 @@ class QAuthTokenVerifier(TokenVerifier):
                 algorithms=["RS256"],
                 issuer=self.issuer_url,
                 audience=self.resource_uri,
-                options={"require": ["exp", "iat", "iss", "aud", "sub"]},
+                options={"require": ["exp", "iat", "iss", "aud", "sub", "nbf"]},
             )
             if (
                 claims.get("token_use") != "mcp_access"

@@ -1,4 +1,8 @@
+import os
 import unittest
+
+os.environ.setdefault("QAUTH_APP_ID", "test-app-id")
+os.environ.setdefault("QAUTH_PUBLIC_KEY", "test-public-key")
 
 from app import app, server_status
 

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from mcp.server import MCPServer
 from mcp.server.auth.settings import AuthSettings
+from mcp.types import ToolAnnotations
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -12,6 +13,7 @@ from starlette.routing import Mount, Route
 from quollnet_mcp.dependencies import qapp_client
 from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
+from quollnet_mcp.tools.articles import search_articles
 
 
 SERVICE_NAME = os.getenv("QUOLLNET_SERVICE", "quollnet-mcp")
@@ -43,6 +45,26 @@ async def server_status() -> dict[str, str]:
         "version": SERVICE_VERSION,
         "status": "ok",
     }
+
+
+mcp.tool(
+    name="search_articles",
+    title="Search Quollnet articles",
+    description=(
+        "Search existing published articles and the authenticated user's drafts; "
+        "returns compact metadata and pagination, not article bodies."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [{"type": "oauth2", "scopes": ["articles:read"]}],
+        "openai/toolInvocation/invoking": "Searching articles",
+        "openai/toolInvocation/invoked": "Article search complete",
+    },
+)(search_articles)
 
 
 async def health(_: Request) -> JSONResponse:
