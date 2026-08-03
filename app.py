@@ -3,20 +3,35 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from mcp.server import MCPServer
+from mcp.server.auth.settings import AuthSettings
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
 from quollnet_mcp.dependencies import qapp_client
+from quollnet_mcp.auth import QAuthTokenVerifier
+from quollnet_mcp.config import get_settings
 
 
 SERVICE_NAME = os.getenv("QUOLLNET_SERVICE", "quollnet-mcp")
 SERVICE_VERSION = os.getenv("QUOLLNET_VERSION", "0.1.0")
+settings = get_settings()
 
 mcp = MCPServer(
     SERVICE_NAME,
     version=SERVICE_VERSION,
+    token_verifier=QAuthTokenVerifier(
+        issuer_url=settings.qauth_issuer_url,
+        resource_uri=settings.mcp_resource_uri,
+        app_id=settings.qauth_app_id,
+        public_key=settings.qauth_public_key,
+    ),
+    auth=AuthSettings(
+        issuer_url=settings.qauth_issuer_url,
+        resource_server_url=settings.mcp_resource_uri,
+        required_scopes=["articles:read"],
+    ),
 )
 
 
