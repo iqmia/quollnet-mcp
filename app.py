@@ -14,6 +14,7 @@ from quollnet_mcp.dependencies import qapp_client
 from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
 from quollnet_mcp.tools.articles import search_articles
+from mcp.server.transport_security import TransportSecuritySettings
 
 
 SERVICE_NAME = os.getenv("QUOLLNET_SERVICE", "quollnet-mcp")
@@ -74,6 +75,16 @@ async def health(_: Request) -> JSONResponse:
 mcp_http_app = mcp.streamable_http_app(
     json_response=True,
     stateless_http=True,
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=[
+            "mcp.quollnet.com",
+            "mcp.quollnet.com:*",
+        ],
+        allowed_origins=[
+            "https://chatgpt.com",
+        ],
+    ),
 )
 
 
