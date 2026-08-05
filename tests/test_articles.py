@@ -9,7 +9,7 @@ os.environ.setdefault("QAUTH_APP_ID", "test-app-id")
 os.environ.setdefault("QAUTH_PUBLIC_KEY", "test-public-key")
 
 from mcp.server.mcpserver.exceptions import ToolError
-
+from quollnet_mcp.services.article_authoring import build_authoring_data
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.tools.articles import (
     create_article_draft,
@@ -24,17 +24,18 @@ class CreateArticleDraftTests(unittest.IsolatedAsyncioTestCase):
             scopes=["articles:read", "articles:create"],
         )
 
-        authoring_data = {
-            "schema_version": 1,
-            "answer_summary": "A concise practical answer.",
-            "search": {},
-            "images": {},
-            "references": [],
-            "internal_links": [],
-            "downloads": [],
-            "tools": [],
-            "social": {},
-        }
+        answer_summary = "A concise practical answer."
+
+        expected_authoring_data = build_authoring_data(
+            slug="test-article-draft",
+            answer_summary=answer_summary,
+            primary_keyword="test article",
+            search_intent="Provide a practical test article.",
+            target_audience="Construction professionals",
+            key_questions=[
+                "What does this test article explain?",
+            ],
+        )
 
         expected = {
             "message": "Article draft created",
@@ -67,7 +68,13 @@ class CreateArticleDraftTests(unittest.IsolatedAsyncioTestCase):
                     "<p>A concise practical answer.</p>"
                 ),
                 primary_article_topic="qa-qc",
-                authoring_data=authoring_data,
+                answer_summary=answer_summary,
+                primary_keyword="test article",
+                search_intent="Provide a practical test article.",
+                target_audience="Construction professionals",
+                key_questions=[
+                    "What does this test article explain?",
+                ],
                 article_topics=[],
                 faq="",
                 lang="en",
@@ -92,7 +99,7 @@ class CreateArticleDraftTests(unittest.IsolatedAsyncioTestCase):
                 "article_topics": [],
                 "lang": "en",
                 "page_type": "article",
-                "authoring_data": authoring_data,
+                "authoring_data": expected_authoring_data,
             },
         )
 

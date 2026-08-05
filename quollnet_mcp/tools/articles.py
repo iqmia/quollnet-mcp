@@ -6,7 +6,7 @@ from pydantic import Field
 
 from quollnet_mcp.dependencies import qapp_client
 from quollnet_mcp.services.qapp_client import QAppClientError
-
+from quollnet_mcp.services.article_authoring import build_authoring_data
 
 async def search_articles(
     q: Annotated[str | None, Field(max_length=250)] = None,
@@ -86,7 +86,7 @@ async def create_article_draft(
             description=(
                 "Complete article HTML. The first top-level element must "
                 "be one H1 matching subject. The second must be a Quick "
-                "Answer paragraph matching authoring_data.answer_summary. "
+                "Answer paragraph matching the answer_summary argument. "
                 "Scripts, event handlers, classes, IDs, embedded media, "
                 "and unsafe HTML are not allowed."
             ),
@@ -100,18 +100,111 @@ async def create_article_draft(
             description="Primary Quollnet article-topic slug.",
         ),
     ],
-    authoring_data: Annotated[
-        dict[str, Any],
+    answer_summary: Annotated[
+        str,
         Field(
+            min_length=1,
+            max_length=2000,
             description=(
-                "Structured article-authoring metadata following the "
-                "qApp article_draft_create.v1 contract. It must contain "
-                "schema_version, answer_summary, search, images, "
-                "references, internal_links, downloads, tools, and "
-                "social. schema_version must be 1."
+                "Concise direct answer to the article's main question. "
+                "The second top-level paragraph in body must contain this "
+                "same text, optionally prefixed with 'Quick answer:'."
             ),
         ),
     ],
+    primary_keyword: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description="Main search keyword targeted by the article.",
+        ),
+    ],
+    search_intent: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description=(
+                "The practical question, problem, or task the article "
+                "is intended to answer."
+            ),
+        ),
+    ],
+    target_audience: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description=(
+                "The construction or engineering professionals for whom "
+                "the article is written."
+            ),
+        ),
+    ],
+    key_questions: Annotated[
+        list[str] | None,
+        Field(
+            max_length=20,
+            description=(
+                "Important practical questions answered by the article."
+            ),
+        ),
+    ] = None,
+    hero_image_prompt: Annotated[
+        str,
+        Field(
+            max_length=2000,
+            description="Prompt for generating the article hero image.",
+        ),
+    ] = "",
+    hero_image_alt_text: Annotated[
+        str,
+        Field(
+            max_length=500,
+            description="Accessible alt text for the hero image.",
+        ),
+    ] = "",
+    og_image_prompt: Annotated[
+        str,
+        Field(
+            max_length=2000,
+            description=(
+                "Prompt for generating the 1200 x 630 Open Graph image."
+            ),
+        ),
+    ] = "",
+    og_image_alt_text: Annotated[
+        str,
+        Field(
+            max_length=500,
+            description="Accessible alt text for the Open Graph image.",
+        ),
+    ] = "",
+    infographic_needed: Annotated[
+        bool,
+        Field(
+            description=(
+                "Whether the article should have a supporting infographic."
+            ),
+        ),
+    ] = False,
+    infographic_prompt: Annotated[
+        str,
+        Field(
+            max_length=2000,
+            description=(
+                "Prompt for the supporting infographic when one is needed."
+            ),
+        ),
+    ] = "",
+    infographic_alt_text: Annotated[
+        str,
+        Field(
+            max_length=500,
+            description="Accessible alt text for the infographic.",
+        ),
+    ] = "",
     article_topics: Annotated[
         list[str] | None,
         Field(
@@ -161,7 +254,21 @@ async def create_article_draft(
         raise ToolError(
             "The connected account does not have articles:create permission"
         )
-
+    authoring_data = build_authoring_data(
+        slug=path,
+        answer_summary=answer_summary,
+        primary_keyword=primary_keyword,
+        search_intent=search_intent,
+        target_audience=target_audience,
+        key_questions=key_questions,
+        hero_image_prompt=hero_image_prompt,
+        hero_image_alt_text=hero_image_alt_text,
+        og_image_prompt=og_image_prompt,
+        og_image_alt_text=og_image_alt_text,
+        infographic_needed=infographic_needed,
+        infographic_prompt=infographic_prompt,
+        infographic_alt_text=infographic_alt_text,
+    )
     payload: dict[str, Any] = {
         "subject": subject,
         "path": path,
