@@ -58,6 +58,7 @@ class QAppClient:
         except ValueError as error:
             raise QAppClientError("qApp returned invalid JSON") from error
 
+    # Search articles tool
     async def search_articles(
         self,
         *,
@@ -89,5 +90,77 @@ class QAppClient:
         return await self.get_json(
             "/articles/api/v1/articles/catalog",
             params=params,
+            access_token=access_token,
+        )
+    
+    async def post_json(
+        self,
+        path: str,
+        payload: Mapping[str, Any],
+        access_token: str | None = None,
+    ) -> Any:
+        """POST a JSON payload to qApp and return its JSON response."""
+        if self._client is None:
+            raise QAppClientError(
+                "QAppClient must be used as an async context manager"
+            )
+
+        headers = (
+            {"Authorization": f"Bearer {access_token}"}
+            if access_token
+            else None
+        )
+
+        try:
+            response = await self._client.post(
+                path,
+                json=dict(payload),
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+
+        except httpx.HTTPStatusError as error:
+            detail = None
+
+            try:
+                response_data = error.response.json()
+                if isinstance(response_data, Mapping):
+                    candidate = (
+                        response_data.get("message")
+                        or response_data.get("error")
+                    )
+                    if isinstance(candidate, str) and candidate.strip():
+                        detail = candidate.strip()
+            except ValueError:
+                pass
+
+            message = (
+                f"qApp returned HTTP {error.response.status_code}"
+            )
+            if detail:
+                message = f"{message}: {detail}"
+
+            raise QAppClientError(message) from error
+
+        except httpx.RequestError as error:
+            raise QAppClientError("qApp request failed") from error
+
+        except ValueError as error:
+            raise QAppClientError(
+                "qApp returned invalid JSON"
+            ) from error
+
+    # Create article draft tool
+    async def create_article_draft(
+        self,
+        *,
+        access_token: str,
+        payload: Mapping[str, Any],
+    ) -> Any:
+        """Create an unpublished article draft through qApp."""
+        return await self.post_json(
+            "/articles/api/v1/articles/drafts",
+            payload=payload,
             access_token=access_token,
         )
