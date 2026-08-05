@@ -40,9 +40,8 @@ mcp = MCPServer(
     ),
 )
 
-# Define a simple health check tool that returns the current service status. 
-# This can be used by monitoring systems to check if the service is running and healthy.
-@mcp.tool()
+# Define a function to return the current service status, including the service 
+# name, version, and status.
 async def server_status() -> dict[str, str]:
     """Return the current service status."""
     return {
