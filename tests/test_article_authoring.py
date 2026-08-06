@@ -81,20 +81,20 @@ class ArticleAuthoringBuilderTests(unittest.TestCase):
         self.assertTrue(social["cta"])
         self.assertEqual(social["avoid"], [])
 
-def test_preserves_explicit_social_avoid(self) -> None:
-    result = build_authoring_data(
-        slug="test-article",
-        answer_summary="Answer",
-        primary_keyword="test",
-        search_intent="informational",
-        target_audience="Engineers",
-        social_avoid=["Avoid unsupported claims"],
-    )
+    def test_preserves_explicit_social_avoid(self) -> None:
+        result = build_authoring_data(
+            slug="test-article",
+            answer_summary="Answer",
+            primary_keyword="test",
+            search_intent="informational",
+            target_audience="Engineers",
+            social_avoid=["Avoid unsupported claims"],
+        )
 
-    self.assertEqual(
-        result["social"]["brief"]["avoid"],
-        ["Avoid unsupported claims"],
-    )
+        self.assertEqual(
+            result["social"]["brief"]["avoid"],
+            ["Avoid unsupported claims"],
+        )
 
 if __name__ == "__main__":
     unittest.main()
