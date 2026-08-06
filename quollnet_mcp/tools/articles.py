@@ -45,8 +45,7 @@ async def create_article_draft(
             min_length=1,
             max_length=250,
             description=(
-                "Article title. It must exactly match the text inside "
-                "the single H1 at the beginning of body."
+                "Human-readable article title."
             ),
         ),
     ],
@@ -67,7 +66,7 @@ async def create_article_draft(
         Field(
             min_length=1,
             max_length=250,
-            description="Concise SEO description for the article.",
+            description="Article SEO meta description"
         ),
     ],
     keywords: Annotated[
@@ -75,7 +74,7 @@ async def create_article_draft(
         Field(
             min_length=1,
             max_length=250,
-            description="Comma-separated article keywords.",
+            description="Comma-separated article keywords."
         ),
     ],
     body: Annotated[
@@ -84,11 +83,7 @@ async def create_article_draft(
             min_length=1,
             max_length=1_000_000,
             description=(
-                "Complete article HTML. The first top-level element must "
-                "be one H1 matching subject. The second must be a Quick "
-                "Answer paragraph matching the answer_summary argument. "
-                "Scripts, event handlers, classes, IDs, embedded media, "
-                "and unsafe HTML are not allowed."
+                "Complete article HTML."
             ),
         ),
     ],
@@ -97,7 +92,7 @@ async def create_article_draft(
         Field(
             min_length=1,
             max_length=100,
-            description="Primary Quollnet article-topic slug.",
+            description="Primary Quollnet article-topic slug."
         ),
     ],
     answer_summary: Annotated[
@@ -106,9 +101,7 @@ async def create_article_draft(
             min_length=1,
             max_length=2000,
             description=(
-                "Concise direct answer to the article's main question. "
-                "The second top-level paragraph in body must contain this "
-                "same text, optionally prefixed with 'Quick answer:'."
+                "Plain-text article answer summary."
             ),
         ),
     ],
@@ -117,7 +110,7 @@ async def create_article_draft(
         Field(
             min_length=1,
             max_length=500,
-            description="Main search keyword targeted by the article.",
+            description="Main search keyword targeted by the article."
         ),
     ],
     search_intent: Annotated[
@@ -126,8 +119,7 @@ async def create_article_draft(
             min_length=1,
             max_length=500,
             description=(
-                "The practical question, problem, or task the article "
-                "is intended to answer."
+                "Search intent addressed by the article."
             ),
         ),
     ],
@@ -137,8 +129,7 @@ async def create_article_draft(
             min_length=1,
             max_length=500,
             description=(
-                "The construction or engineering professionals for whom "
-                "the article is written."
+                "Primary professional audience."
             ),
         ),
     ],
@@ -147,7 +138,7 @@ async def create_article_draft(
         Field(
             max_length=20,
             description=(
-                "Important practical questions answered by the article."
+                "Important questions addressed by the article."
             ),
         ),
     ] = None,
@@ -155,7 +146,7 @@ async def create_article_draft(
         str,
         Field(
             max_length=2000,
-            description="Prompt for generating the article hero image.",
+            description="Prompt for generating the article hero image."
         ),
     ] = "",
     hero_image_alt_text: Annotated[
@@ -170,7 +161,7 @@ async def create_article_draft(
         Field(
             max_length=2000,
             description=(
-                "Prompt for generating the 1200 x 630 Open Graph image."
+                "Open Graph image prompt."
             ),
         ),
     ] = "",
@@ -220,9 +211,7 @@ async def create_article_draft(
         Field(
             max_length=50_000,
             description=(
-                "Optional FAQ text. Each block must contain exactly a "
-                "'q:' line followed by an 'a:' line. Separate pairs with "
-                "a blank line."
+                "FAQ - formatted as q: question text, a: answer text"
             ),
         ),
     ] = "",
@@ -231,7 +220,7 @@ async def create_article_draft(
         Field(
             min_length=2,
             max_length=20,
-            description="Supported article language code. Default: en.",
+            description="Article language code.",
         ),
     ] = "en",
     page_type: Literal["article"] = "article",

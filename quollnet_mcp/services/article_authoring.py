@@ -3,11 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 
-_DEFAULT_SOCIAL_AVOID = [
-    "Unsupported technical or contractual certainty",
-    "Claims that are not supported by the article or its references",
-]
-
 
 def build_authoring_data(
     *,
@@ -50,11 +45,7 @@ def build_authoring_data(
     if not social_points:
         social_points = [answer_summary]
 
-    avoid_items = (
-        list(social_avoid)
-        if social_avoid is not None
-        else list(_DEFAULT_SOCIAL_AVOID)
-    )
+    avoid_items = list(social_avoid or [])
 
     infographic_filename = (
         f"{slug}-infographic.webp"
