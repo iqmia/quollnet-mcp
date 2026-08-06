@@ -16,6 +16,7 @@ from quollnet_mcp.config import get_settings
 from quollnet_mcp.tools.articles import (
     create_article_draft,
     search_articles,
+    get_article_authoring_policy,
 )
 from mcp.server.transport_security import TransportSecuritySettings
 
@@ -71,6 +72,36 @@ mcp.tool(
     },
 )(search_articles)
 
+
+# Define the get_article_authoring_policy tool, which retrieves the current
+# authoritative Quollnet article-authoring policy from qApp. This tool requires the
+# "articles:read" scope for authorization.
+mcp.tool(
+    name="get_article_authoring_policy",
+    title="Get Quollnet article-authoring policy",
+    description=(
+        "Retrieve the current authoritative Quollnet article-authoring "
+        "policy from qApp. Use it before preparing or creating an article "
+        "draft."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:read"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Retrieving article policy",
+        "openai/toolInvocation/invoked": "Article policy retrieved",
+    },
+)(get_article_authoring_policy)
+
+
 # Define the create_article_draft tool, which allows authenticated users to create
 # new article drafts in the Quollnet system. This tool requires the "articles:create"
 # scope for authorization.
@@ -98,6 +129,7 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article draft created",
     },
 )(create_article_draft)
+
 
 # Define a health check endpoint that returns the current service status in JSON format.
 async def health(_: Request) -> JSONResponse:
@@ -138,3 +170,4 @@ app = Starlette(
     ],
     lifespan=lifespan,
 )
+

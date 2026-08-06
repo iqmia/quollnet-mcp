@@ -279,3 +279,23 @@ async def create_article_draft(
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
+
+async def get_article_authoring_policy() -> dict[str, Any]:
+    """Retrieve the current authoritative Quollnet article-authoring policy."""
+    access_token = get_access_token()
+
+    if access_token is None or not access_token.subject:
+        raise ToolError("Authentication is required")
+
+    scopes = set(access_token.scopes or [])
+    if "articles:read" not in scopes:
+        raise ToolError(
+            "The connected account does not have articles:read permission"
+        )
+
+    try:
+        return await qapp_client.get_article_authoring_policy(
+            access_token=access_token.token,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error

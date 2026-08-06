@@ -165,13 +165,13 @@ class QAppClient:
             access_token=access_token,
         )
 
-async def get_article_authoring_policy(
-    self,
-    *,
-    access_token: str,
-) -> Any:
-    """Retrieve the current article-authoring policy from qApp."""
-    return await self.get_json(
-        "/articles/api/v1/articles/authoring-policy",
-        access_token=access_token,
-    )
+    async def get_article_authoring_policy(
+        self,
+        *,
+        access_token: str,
+    ) -> Any:
+        """Retrieve the current article-authoring policy from qApp."""
+        return await self.get_json(
+            "/articles/api/v1/articles/authoring-policy",
+            access_token=access_token,
+        )
