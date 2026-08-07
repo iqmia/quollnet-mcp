@@ -13,6 +13,7 @@ from quollnet_mcp.services.article_authoring import build_authoring_data
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.tools.articles import (
     create_article_draft,
+    get_internal_link_candidates,
     search_articles,
 )
 
@@ -160,6 +161,194 @@ class SearchArticlesTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.assertRaisesRegex(ToolError, "Article search failed"):
                 await search_articles()
+
+
+class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
+    _QAPP_RESPONSE = {
+        "message": "ok",
+        "data": {
+            "articles": [{"slug": "article-a", "title": "Article A"}],
+            "checklists": [{"slug": "checklist-b", "title": "Checklist B"}],
+            "methods": [{"slug": "method-c", "title": "Method C"}],
+        },
+    }
+
+    def _token(self, scopes=("articles:read",), subject="user-1"):
+        return SimpleNamespace(
+            token="bearer-token",
+            subject=subject,
+            scopes=list(scopes),
+        )
+
+    async def test_forwards_access_token(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(return_value=self._QAPP_RESPONSE),
+            ) as mock_call,
+        ):
+            await get_internal_link_candidates(text="some text")
+
+        mock_call.assert_awaited_once()
+        _, kwargs = mock_call.call_args
+        self.assertEqual(kwargs["access_token"], "bearer-token")
+
+    async def test_forwards_text_unchanged(self) -> None:
+        article_text = "Detailed article text about construction quality."
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(return_value=self._QAPP_RESPONSE),
+            ) as mock_call,
+        ):
+            await get_internal_link_candidates(text=article_text)
+
+        _, kwargs = mock_call.call_args
+        self.assertEqual(kwargs["text"], article_text)
+
+    async def test_top_n_defaults_to_10(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(return_value=self._QAPP_RESPONSE),
+            ) as mock_call,
+        ):
+            await get_internal_link_candidates(text="text")
+
+        _, kwargs = mock_call.call_args
+        self.assertEqual(kwargs["top_n"], 10)
+
+    async def test_exclude_slugs_defaults_to_none(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(return_value=self._QAPP_RESPONSE),
+            ) as mock_call,
+        ):
+            await get_internal_link_candidates(text="text")
+
+        _, kwargs = mock_call.call_args
+        self.assertIsNone(kwargs["exclude_slugs"])
+
+    async def test_explicit_top_n_and_exclude_slugs_are_forwarded(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(return_value=self._QAPP_RESPONSE),
+            ) as mock_call,
+        ):
+            await get_internal_link_candidates(
+                text="text",
+                top_n=5,
+                exclude_slugs=["draft-slug"],
+            )
+
+        _, kwargs = mock_call.call_args
+        self.assertEqual(kwargs["top_n"], 5)
+        self.assertEqual(kwargs["exclude_slugs"], ["draft-slug"])
+
+    async def test_returns_qapp_response_unchanged(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(return_value=self._QAPP_RESPONSE),
+            ),
+        ):
+            result = await get_internal_link_candidates(text="text")
+
+        self.assertIs(result, self._QAPP_RESPONSE)
+
+    async def test_result_groups_are_not_reranked_or_mutated(self) -> None:
+        """The three result groups must be returned as-is from qApp."""
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(return_value=self._QAPP_RESPONSE),
+            ),
+        ):
+            result = await get_internal_link_candidates(text="text")
+
+        data = result["data"]
+        self.assertIn("articles", data)
+        self.assertIn("checklists", data)
+        self.assertIn("methods", data)
+        # Verify all three groups are preserved as distinct lists (not flattened)
+        self.assertIsInstance(data["articles"], list)
+        self.assertIsInstance(data["checklists"], list)
+        self.assertIsInstance(data["methods"], list)
+
+    async def test_missing_authentication_raises_tool_error(self) -> None:
+        with patch(
+            "quollnet_mcp.tools.articles.get_access_token", return_value=None
+        ):
+            with self.assertRaises(ToolError):
+                await get_internal_link_candidates(text="text")
+
+    async def test_missing_subject_raises_tool_error(self) -> None:
+        token = SimpleNamespace(token="bearer-token", subject=None, scopes=["articles:read"])
+        with patch(
+            "quollnet_mcp.tools.articles.get_access_token", return_value=token
+        ):
+            with self.assertRaises(ToolError):
+                await get_internal_link_candidates(text="text")
+
+    async def test_missing_articles_read_scope_raises_tool_error(self) -> None:
+        token = SimpleNamespace(token="bearer-token", subject="user-1", scopes=[])
+        with patch(
+            "quollnet_mcp.tools.articles.get_access_token", return_value=token
+        ):
+            with self.assertRaisesRegex(ToolError, "articles:read"):
+                await get_internal_link_candidates(text="text")
+
+    async def test_qapp_error_is_converted_to_tool_error(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
+                new=AsyncMock(side_effect=QAppClientError("upstream error")),
+            ),
+        ):
+            with self.assertRaises(ToolError):
+                await get_internal_link_candidates(text="text")
+
+
+class AppRegistrationTests(unittest.TestCase):
+    def test_get_internal_link_candidates_is_registered(self) -> None:
+        import app as app_module
+
+        tool_names = {tool.name for tool in app_module.mcp._tool_manager._tools.values()}
+        self.assertIn("get_internal_link_candidates", tool_names)
 
 
 if __name__ == "__main__":

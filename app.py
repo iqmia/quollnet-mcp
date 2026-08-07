@@ -15,6 +15,7 @@ from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
 from quollnet_mcp.tools.articles import (
     create_article_draft,
+    get_internal_link_candidates,
     search_articles,
     get_article_authoring_policy,
 )
@@ -100,6 +101,34 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article policy retrieved",
     },
 )(get_article_authoring_policy)
+
+
+mcp.tool(
+    name="get_internal_link_candidates",
+    title="Get Quollnet internal-link candidates",
+    description=(
+        "Find ranked Quollnet internal-link candidates for a substantially completed "
+        "article. Returns related articles, checklists associated with those articles, "
+        "and related Method Statement/ITP candidates. Review the candidates and use "
+        "only links that genuinely help the reader; do not insert all returned links "
+        "automatically."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:read"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Finding related Quollnet content",
+        "openai/toolInvocation/invoked": "Related content found",
+    },
+)(get_internal_link_candidates)
 
 
 # Define the create_article_draft tool, which allows authenticated users to create

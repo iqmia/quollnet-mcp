@@ -344,6 +344,48 @@ async def create_article_draft(
     except QAppClientError as error:
         raise ToolError(str(error)) from error
 
+async def get_internal_link_candidates(
+    text: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=100_000,
+            description=(
+                "The completed article text or a detailed final summary used "
+                "to find relevant Quollnet internal links."
+            ),
+        ),
+    ],
+    top_n: Annotated[int, Field(ge=1, le=20)] = 10,
+    exclude_slugs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Find ranked Quollnet internal-link candidates for a substantially completed
+    article. Returns related articles, checklists associated with those articles,
+    and related Method Statement/ITP candidates. Review the candidates and use
+    only links that genuinely help the reader; do not insert all returned links
+    automatically."""
+    access_token = get_access_token()
+
+    if access_token is None or not access_token.subject:
+        raise ToolError("Authentication is required")
+
+    scopes = set(access_token.scopes or [])
+    if "articles:read" not in scopes:
+        raise ToolError(
+            "The connected account does not have articles:read permission"
+        )
+
+    try:
+        return await qapp_client.get_internal_link_candidates(
+            access_token=access_token.token,
+            text=text,
+            top_n=top_n,
+            exclude_slugs=exclude_slugs,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
 async def get_article_authoring_policy() -> dict[str, Any]:
     """Retrieve the current authoritative Quollnet article-authoring policy."""
     access_token = get_access_token()

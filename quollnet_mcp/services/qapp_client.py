@@ -165,6 +165,25 @@ class QAppClient:
             access_token=access_token,
         )
 
+    async def get_internal_link_candidates(
+        self,
+        *,
+        access_token: str,
+        text: str,
+        top_n: int = 10,
+        exclude_slugs: list[str] | None = None,
+    ) -> Any:
+        """Return internal-link candidates from qApp for the given text."""
+        return await self.post_json(
+            "/articles/api/v1/articles/internal-link-candidates",
+            payload={
+                "text": text,
+                "top_n": top_n,
+                "exclude_slugs": exclude_slugs or [],
+            },
+            access_token=access_token,
+        )
+
     async def get_article_authoring_policy(
         self,
         *,
