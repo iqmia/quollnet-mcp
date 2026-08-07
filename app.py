@@ -332,7 +332,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["articles:files:create"],
+                "scopes": ["articles:files:update"],
             }
         ],
         "openai/toolInvocation/invoking": "Renaming article file",
