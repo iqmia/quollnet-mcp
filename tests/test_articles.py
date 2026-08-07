@@ -16,6 +16,7 @@ from quollnet_mcp.tools.articles import (
     edit_article_draft,
     get_article,
     get_internal_link_candidates,
+    replace_article_body_text,
     search_articles,
 )
 
@@ -571,6 +572,85 @@ class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
         _, kwargs = mock_edit.call_args
         authoring = kwargs["payload"]["authoring_data"]
         self.assertEqual(authoring["references"], [])
+
+
+# ---------------------------------------------------------------------------
+# replace_article_body_text
+# ---------------------------------------------------------------------------
+
+class ReplaceArticleBodyTextTests(unittest.IsolatedAsyncioTestCase):
+    def _token(self, scopes=("articles:read", "articles:edit"), subject="user-1"):
+        return SimpleNamespace(
+            token="bearer-token",
+            subject=subject,
+            scopes=list(scopes),
+        )
+
+    _RESPONSE = {"message": "Article text updated", "data": {"id": "art-42"}}
+
+    async def test_forwards_article_id_texts_and_token(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.replace_article_body_text",
+                new=AsyncMock(return_value=self._RESPONSE),
+            ) as mock_replace,
+        ):
+            actual = await replace_article_body_text(
+                article_id="art-42",
+                old_text="Hello world",
+                new_text="Hello Quollnet",
+            )
+
+        self.assertIs(actual, self._RESPONSE)
+        mock_replace.assert_awaited_once_with(
+            access_token="bearer-token",
+            article_id="art-42",
+            old_text="Hello world",
+            new_text="Hello Quollnet",
+        )
+
+    async def test_requires_articles_edit_scope(self) -> None:
+        token = SimpleNamespace(token="t", subject="user-1", scopes=["articles:read"])
+        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=token):
+            with self.assertRaisesRegex(ToolError, "articles:edit"):
+                await replace_article_body_text(
+                    article_id="art-42",
+                    old_text="old",
+                    new_text="new",
+                )
+
+    async def test_missing_authentication_raises_tool_error(self) -> None:
+        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=None):
+            with self.assertRaises(ToolError):
+                await replace_article_body_text(
+                    article_id="art-42",
+                    old_text="old",
+                    new_text="new",
+                )
+
+    async def test_qapp_client_error_becomes_tool_error(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.replace_article_body_text",
+                new=AsyncMock(
+                    side_effect=QAppClientError("text not found in article body")
+                ),
+            ),
+        ):
+            with self.assertRaisesRegex(ToolError, "text not found in article body"):
+                await replace_article_body_text(
+                    article_id="art-42",
+                    old_text="missing text",
+                    new_text="replacement",
+                )
 
 
 if __name__ == "__main__":

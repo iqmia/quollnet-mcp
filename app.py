@@ -18,6 +18,7 @@ from quollnet_mcp.tools.articles import (
     edit_article_draft,
     get_article,
     get_internal_link_candidates,
+    replace_article_body_text,
     search_articles,
     get_article_authoring_policy,
 )
@@ -213,6 +214,34 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article draft updated",
     },
 )(edit_article_draft)
+
+
+mcp.tool(
+    name="replace_article_body_text",
+    title="Replace text in Quollnet article draft",
+    description=(
+        "Replace one exact piece of text in an unpublished Quollnet article draft "
+        "without resending the full article body. Use this for small wording changes, "
+        "URL substitutions, or replacing download placeholders. The old text must "
+        "occur exactly once. Use edit_article_draft for substantial edits or changes "
+        "that must also update authoring metadata."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:edit"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Updating article text",
+        "openai/toolInvocation/invoked": "Article text updated",
+    },
+)(replace_article_body_text)
 
 
 # Define a health check endpoint that returns the current service status in JSON format.

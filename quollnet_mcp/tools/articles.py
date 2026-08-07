@@ -600,3 +600,59 @@ async def edit_article_draft(
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
+
+
+async def replace_article_body_text(
+    article_id: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=250,
+            description="ID of the existing unpublished draft to edit.",
+        ),
+    ],
+    old_text: Annotated[
+        str,
+        Field(
+            min_length=1,
+            description=(
+                "The exact literal text currently present in the article body. "
+                "Must occur exactly once."
+            ),
+        ),
+    ],
+    new_text: Annotated[
+        str,
+        Field(
+            description=(
+                "Replacement text. An empty string is allowed to remove the "
+                "matched text."
+            ),
+        ),
+    ],
+) -> dict[str, Any]:
+    """Replace one exact piece of text in an unpublished Quollnet article draft
+    without resending the full article body. Use this for small wording changes,
+    URL substitutions, or replacing download placeholders. The old text must
+    occur exactly once. Use edit_article_draft for substantial edits or changes
+    that must also update authoring metadata."""
+    access_token = get_access_token()
+
+    if access_token is None or not access_token.subject:
+        raise ToolError("Authentication is required")
+
+    scopes = set(access_token.scopes or [])
+    if "articles:edit" not in scopes:
+        raise ToolError(
+            "The connected account does not have articles:edit permission"
+        )
+
+    try:
+        return await qapp_client.replace_article_body_text(
+            access_token=access_token.token,
+            article_id=article_id,
+            old_text=old_text,
+            new_text=new_text,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error

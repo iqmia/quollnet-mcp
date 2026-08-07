@@ -276,3 +276,22 @@ class QAppClient:
             payload=payload,
             access_token=access_token,
         )
+
+    # Replace article body text tool
+    async def replace_article_body_text(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+        old_text: str,
+        new_text: str,
+    ) -> Any:
+        """Replace one exact piece of text in an article draft body through qApp."""
+        return await self.patch_json(
+            f"/articles/api/v1/articles/{article_id}/body-text",
+            payload={
+                "old_text": old_text,
+                "new_text": new_text,
+            },
+            access_token=access_token,
+        )
