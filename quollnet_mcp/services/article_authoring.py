@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 
@@ -98,3 +99,79 @@ def build_authoring_data(
             },
         },
     }
+
+
+_UNSET = object()
+
+
+def merge_authoring_data_for_edit(
+    existing: dict[str, Any],
+    *,
+    answer_summary: Any = _UNSET,
+    primary_keyword: Any = _UNSET,
+    search_intent: Any = _UNSET,
+    target_audience: Any = _UNSET,
+    key_questions: Any = _UNSET,
+    hero_image_prompt: Any = _UNSET,
+    hero_image_alt_text: Any = _UNSET,
+    og_image_prompt: Any = _UNSET,
+    og_image_alt_text: Any = _UNSET,
+    infographic_needed: Any = _UNSET,
+    infographic_prompt: Any = _UNSET,
+    infographic_alt_text: Any = _UNSET,
+    references: Any = _UNSET,
+    internal_links: Any = _UNSET,
+    tools: Any = _UNSET,
+) -> dict[str, Any]:
+    """
+    Deep-copy existing authoring_data and apply only the explicitly supplied
+    public authoring changes. Returns the merged complete authoring_data.
+
+    Fields that are left as _UNSET are not touched.
+    """
+    merged: dict[str, Any] = copy.deepcopy(existing)
+
+    if answer_summary is not _UNSET:
+        merged["answer_summary"] = answer_summary
+
+    search = merged.setdefault("search", {})
+    if primary_keyword is not _UNSET:
+        search["primary_keyword"] = primary_keyword
+    if search_intent is not _UNSET:
+        search["search_intent"] = search_intent
+    if target_audience is not _UNSET:
+        search["target_audience"] = target_audience
+        # Keep social.brief.target_audience aligned (mirrors create_article_draft)
+        merged.setdefault("social", {}).setdefault("brief", {})["target_audience"] = target_audience
+    if key_questions is not _UNSET:
+        search["key_questions"] = key_questions
+
+    images = merged.setdefault("images", {})
+    hero = images.setdefault("hero", {})
+    if hero_image_prompt is not _UNSET:
+        hero["prompt"] = hero_image_prompt
+    if hero_image_alt_text is not _UNSET:
+        hero["alt_text"] = hero_image_alt_text
+
+    og = images.setdefault("og", {})
+    if og_image_prompt is not _UNSET:
+        og["prompt"] = og_image_prompt
+    if og_image_alt_text is not _UNSET:
+        og["alt_text"] = og_image_alt_text
+
+    infographic = images.setdefault("infographic", {})
+    if infographic_needed is not _UNSET:
+        infographic["needed"] = infographic_needed
+    if infographic_prompt is not _UNSET:
+        infographic["prompt"] = infographic_prompt
+    if infographic_alt_text is not _UNSET:
+        infographic["alt_text"] = infographic_alt_text
+
+    if references is not _UNSET:
+        merged["references"] = references
+    if internal_links is not _UNSET:
+        merged["internal_links"] = internal_links
+    if tools is not _UNSET:
+        merged["tools"] = tools
+
+    return merged

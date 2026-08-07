@@ -15,6 +15,8 @@ from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
 from quollnet_mcp.tools.articles import (
     create_article_draft,
+    edit_article_draft,
+    get_article,
     get_internal_link_candidates,
     search_articles,
     get_article_authoring_policy,
@@ -159,6 +161,58 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article draft created",
     },
 )(create_article_draft)
+
+
+mcp.tool(
+    name="get_article",
+    title="Get Quollnet article",
+    description=(
+        "Retrieve the full content and editable metadata for a Quollnet article by "
+        "ID. Use search_articles first when the article ID is not already known."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:read"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Retrieving article",
+        "openai/toolInvocation/invoked": "Article retrieved",
+    },
+)(get_article)
+
+
+mcp.tool(
+    name="edit_article_draft",
+    title="Edit Quollnet article draft",
+    description=(
+        "Edit selected fields of an existing unpublished Quollnet article draft. "
+        "Retrieve the draft first when reviewing or substantially revising existing "
+        "content. qApp performs authoritative validation and will reject edits to "
+        "published articles."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:edit"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Updating article draft",
+        "openai/toolInvocation/invoked": "Article draft updated",
+    },
+)(edit_article_draft)
 
 
 # Define a health check endpoint that returns the current service status in JSON format.

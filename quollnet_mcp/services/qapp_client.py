@@ -151,6 +151,60 @@ class QAppClient:
                 "qApp returned invalid JSON"
             ) from error
 
+    async def patch_json(
+        self,
+        path: str,
+        payload: Mapping[str, Any],
+        access_token: str | None = None,
+    ) -> Any:
+        """PATCH a JSON payload to qApp and return its JSON response."""
+        if self._client is None:
+            raise QAppClientError(
+                "QAppClient must be used as an async context manager"
+            )
+
+        headers = (
+            {"Authorization": f"Bearer {access_token}"}
+            if access_token
+            else None
+        )
+
+        try:
+            response = await self._client.patch(
+                path,
+                json=dict(payload),
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+
+        except httpx.HTTPStatusError as error:
+            detail = None
+
+            try:
+                response_data = error.response.json()
+                if isinstance(response_data, Mapping):
+                    candidate = (
+                        response_data.get("message")
+                        or response_data.get("error")
+                    )
+                    if isinstance(candidate, str) and candidate.strip():
+                        detail = candidate.strip()
+            except ValueError:
+                pass
+
+            message = f"qApp returned HTTP {error.response.status_code}"
+            if detail:
+                message = f"{message}: {detail}"
+
+            raise QAppClientError(message) from error
+
+        except httpx.RequestError as error:
+            raise QAppClientError("qApp request failed") from error
+
+        except ValueError as error:
+            raise QAppClientError("qApp returned invalid JSON") from error
+
     # Create article draft tool
     async def create_article_draft(
         self,
@@ -192,5 +246,33 @@ class QAppClient:
         """Retrieve the current article-authoring policy from qApp."""
         return await self.get_json(
             "/articles/api/v1/articles/authoring-policy",
+            access_token=access_token,
+        )
+
+    # Get article tool
+    async def get_article(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+    ) -> Any:
+        """Retrieve a single article by ID from qApp."""
+        return await self.get_json(
+            f"/articles/api/v1/articles/{article_id}",
+            access_token=access_token,
+        )
+
+    # Edit article draft tool
+    async def edit_article_draft(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+        payload: Mapping[str, Any],
+    ) -> Any:
+        """PATCH an existing unpublished article draft through qApp."""
+        return await self.patch_json(
+            f"/articles/api/v1/articles/{article_id}",
+            payload=payload,
             access_token=access_token,
         )

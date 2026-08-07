@@ -13,6 +13,8 @@ from quollnet_mcp.services.article_authoring import build_authoring_data
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.tools.articles import (
     create_article_draft,
+    edit_article_draft,
+    get_article,
     get_internal_link_candidates,
     search_articles,
 )
@@ -349,6 +351,226 @@ class AppRegistrationTests(unittest.TestCase):
 
         tool_names = {tool.name for tool in app_module.mcp._tool_manager._tools.values()}
         self.assertIn("get_internal_link_candidates", tool_names)
+
+
+# ---------------------------------------------------------------------------
+# get_article
+# ---------------------------------------------------------------------------
+
+class GetArticleTests(unittest.IsolatedAsyncioTestCase):
+    def _token(self, scopes=("articles:read",), subject="user-1"):
+        return SimpleNamespace(
+            token="bearer-token",
+            subject=subject,
+            scopes=list(scopes),
+        )
+
+    _ARTICLE_RESPONSE = {
+        "message": "ok",
+        "data": {
+            "id": "art-42",
+            "subject": "Test Article",
+            "body": "<p>Hello</p>",
+            "authoring_data": {"answer_summary": "A summary"},
+        },
+    }
+
+    async def test_forwards_article_id_and_access_token(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_article",
+                new=AsyncMock(return_value=self._ARTICLE_RESPONSE),
+            ) as mock_get,
+        ):
+            result = await get_article(article_id="art-42")
+
+        self.assertIs(result, self._ARTICLE_RESPONSE)
+        mock_get.assert_awaited_once_with(
+            access_token="bearer-token",
+            article_id="art-42",
+        )
+
+    async def test_missing_authentication_raises_tool_error(self) -> None:
+        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=None):
+            with self.assertRaises(ToolError):
+                await get_article(article_id="art-1")
+
+    async def test_missing_scope_raises_tool_error(self) -> None:
+        token = SimpleNamespace(token="t", subject="user-1", scopes=[])
+        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=token):
+            with self.assertRaisesRegex(ToolError, "articles:read"):
+                await get_article(article_id="art-1")
+
+    async def test_qapp_error_becomes_tool_error(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_article",
+                new=AsyncMock(side_effect=QAppClientError("not found")),
+            ),
+        ):
+            with self.assertRaisesRegex(ToolError, "not found"):
+                await get_article(article_id="art-1")
+
+
+# ---------------------------------------------------------------------------
+# edit_article_draft
+# ---------------------------------------------------------------------------
+
+class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
+    def _token(self, scopes=("articles:read", "articles:edit"), subject="user-1"):
+        return SimpleNamespace(
+            token="bearer-token",
+            subject=subject,
+            scopes=list(scopes),
+        )
+
+    _EDIT_RESPONSE = {"message": "Article draft updated", "data": {"id": "art-42"}}
+
+    _CURRENT_ARTICLE = {
+        "message": "ok",
+        "data": {
+            "id": "art-42",
+            "authoring_data": {
+                "schema_version": 1,
+                "answer_summary": "Old summary",
+                "search": {
+                    "primary_keyword": "old keyword",
+                    "search_intent": "old intent",
+                    "target_audience": "old audience",
+                    "key_questions": [],
+                },
+                "images": {
+                    "hero": {"prompt": "", "alt_text": "", "suggested_filename": ""},
+                    "og": {"prompt": "", "alt_text": "", "suggested_filename": ""},
+                    "infographic": {
+                        "needed": False,
+                        "prompt": "",
+                        "alt_text": "",
+                        "suggested_filename": "",
+                    },
+                },
+                "references": [],
+                "internal_links": [{"article_id": "x", "slug": "x", "title": "X",
+                                     "url": "https://example.com", "anchor_text": "X",
+                                     "reason": "r"}],
+                "downloads": [],
+                "tools": [],
+                "social": {
+                    "brief": {
+                        "primary_angle": "Old summary",
+                        "target_audience": "old audience",
+                        "key_points": [],
+                        "strongest_hook": "Old summary",
+                        "cta": "Read more.",
+                        "avoid": [],
+                    }
+                },
+            },
+        },
+    }
+
+    async def test_body_only_edit_sends_only_body(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.edit_article_draft",
+                new=AsyncMock(return_value=self._EDIT_RESPONSE),
+            ) as mock_edit,
+        ):
+            await edit_article_draft(article_id="art-42", body="<p>New body</p>")
+
+        mock_edit.assert_awaited_once_with(
+            access_token="bearer-token",
+            article_id="art-42",
+            payload={"body": "<p>New body</p>"},
+        )
+
+    async def test_empty_edit_raises_tool_error_without_calling_qapp(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.edit_article_draft",
+                new=AsyncMock(),
+            ) as mock_edit,
+        ):
+            with self.assertRaisesRegex(ToolError, "No article changes"):
+                await edit_article_draft(article_id="art-42")
+
+        mock_edit.assert_not_awaited()
+
+    async def test_missing_articles_edit_scope_raises_tool_error(self) -> None:
+        token = SimpleNamespace(token="t", subject="user-1", scopes=["articles:read"])
+        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=token):
+            with self.assertRaisesRegex(ToolError, "articles:edit"):
+                await edit_article_draft(article_id="art-42", body="<p>x</p>")
+
+    async def test_authoring_edit_retrieves_current_and_merges(self) -> None:
+        """Changing answer_summary must fetch current article and preserve
+        unrelated authoring_data fields (e.g. existing internal_links)."""
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_article",
+                new=AsyncMock(return_value=self._CURRENT_ARTICLE),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.edit_article_draft",
+                new=AsyncMock(return_value=self._EDIT_RESPONSE),
+            ) as mock_edit,
+        ):
+            await edit_article_draft(
+                article_id="art-42",
+                answer_summary="New summary",
+            )
+
+        _, kwargs = mock_edit.call_args
+        authoring = kwargs["payload"]["authoring_data"]
+        # Changed field is updated
+        self.assertEqual(authoring["answer_summary"], "New summary")
+        # Unrelated field is preserved
+        self.assertEqual(len(authoring["internal_links"]), 1)
+        self.assertEqual(authoring["internal_links"][0]["article_id"], "x")
+        # primary_keyword was NOT changed
+        self.assertEqual(authoring["search"]["primary_keyword"], "old keyword")
+
+    async def test_replacing_references_with_empty_list(self) -> None:
+        """Explicitly passing references=[] must clear references in the payload."""
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.get_access_token",
+                return_value=self._token(),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_article",
+                new=AsyncMock(return_value=self._CURRENT_ARTICLE),
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.edit_article_draft",
+                new=AsyncMock(return_value=self._EDIT_RESPONSE),
+            ) as mock_edit,
+        ):
+            await edit_article_draft(article_id="art-42", references=[])
+
+        _, kwargs = mock_edit.call_args
+        authoring = kwargs["payload"]["authoring_data"]
+        self.assertEqual(authoring["references"], [])
 
 
 if __name__ == "__main__":
