@@ -109,9 +109,10 @@ mcp.tool(
     name="create_article_draft",
     title="Create Quollnet article draft",
     description=(
-        "Create a new unpublished Quollnet article draft owned by the "
-        "authenticated user. The draft is validated by qApp and cannot "
-        "be published or assigned to another user through this tool."
+        "Create an unpublished Quollnet article draft for the authenticated "
+        "user. Retrieve and follow the current article-authoring policy before "
+        "calling this tool. The tool cannot publish an article or assign "
+        "another owner."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False,

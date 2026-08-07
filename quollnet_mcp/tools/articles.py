@@ -2,11 +2,12 @@ from typing import Annotated, Any, Literal
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver.exceptions import ToolError
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from quollnet_mcp.dependencies import qapp_client
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.services.article_authoring import build_authoring_data
+
 
 async def search_articles(
     q: Annotated[str | None, Field(max_length=250)] = None,
@@ -37,6 +38,37 @@ async def search_articles(
         )
     except QAppClientError as error:
         raise ToolError("Article search failed") from error
+
+# the following classes 
+class ArticleReferenceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: Annotated[str, Field(min_length=1, max_length=500)]
+    url: Annotated[str, Field(min_length=1, pattern=r"^https?://")]
+    publisher: Annotated[str, Field(min_length=1, max_length=500)]
+    reference_type: Annotated[str, Field(min_length=1, max_length=100)]
+    notes: Annotated[str, Field(max_length=1000)] = ""
+
+
+class ArticleInternalLinkInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    article_id: Annotated[str, Field(min_length=1, max_length=250)]
+    slug: Annotated[str, Field(min_length=1, max_length=250)]
+    title: Annotated[str, Field(min_length=1, max_length=500)]
+    url: Annotated[str, Field(min_length=1, pattern=r"^https?://")]
+    anchor_text: Annotated[str, Field(min_length=1, max_length=500)]
+    reason: Annotated[str, Field(min_length=1, max_length=1000)]
+
+
+class ArticleToolInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, Field(min_length=1, max_length=500)]
+    url_slug: Annotated[str, Field(min_length=1, max_length=250)]
+    shortcode: Annotated[str, Field(min_length=1, max_length=500)]
+    placement_note: Annotated[str, Field(max_length=1000)] = ""
+    
 
 async def create_article_draft(
     subject: Annotated[
@@ -224,6 +256,35 @@ async def create_article_draft(
         ),
     ] = "en",
     page_type: Literal["article"] = "article",
+    references: Annotated[
+        list[ArticleReferenceInput] | None,
+        Field(
+            description=(
+                "External references used by the article. These should also "
+                "appear as visible reference links at the bottom of the body."
+            )
+        ),
+    ] = None,
+
+    internal_links: Annotated[
+        list[ArticleInternalLinkInput] | None,
+        Field(
+            description=(
+                "Selected Quollnet internal links returned by the internal-link "
+                "candidate workflow and actually used in the article body."
+            )
+        ),
+    ] = None,
+
+    tools: Annotated[
+        list[ArticleToolInput] | None,
+        Field(
+            description=(
+                "Quollnet tools intentionally embedded in the article body "
+                "using the trusted [[qtool:tool-url-slug]] shortcode."
+            )
+        ),
+] = None,
 ) -> dict[str, Any]:
     """
     Create a new unpublished Quollnet article draft owned by the
@@ -257,6 +318,9 @@ async def create_article_draft(
         infographic_needed=infographic_needed,
         infographic_prompt=infographic_prompt,
         infographic_alt_text=infographic_alt_text,
+        references=[item.model_dump() for item in references or []],
+        internal_links=[item.model_dump() for item in internal_links or []],
+        tools=[item.model_dump() for item in tools or []],
     )
     payload: dict[str, Any] = {
         "subject": subject,
