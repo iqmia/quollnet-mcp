@@ -16,8 +16,11 @@ from quollnet_mcp.tools.articles import (
     edit_article_draft,
     get_article,
     get_internal_link_candidates,
+    list_article_files,
+    rename_article_file,
     replace_article_body_text,
     search_articles,
+    upload_article_file,
 )
 
 class CreateArticleDraftTests(unittest.IsolatedAsyncioTestCase):
@@ -651,6 +654,179 @@ class ReplaceArticleBodyTextTests(unittest.IsolatedAsyncioTestCase):
                     old_text="missing text",
                     new_text="replacement",
                 )
+
+
+import base64
+
+
+class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
+    def _token(self, scopes=None):
+        return SimpleNamespace(
+            token="upload-token",
+            subject="user-1",
+            scopes=scopes or ["articles:files:create"],
+        )
+
+    async def test_valid_base64_decoded_and_forwarded(self) -> None:
+        raw = b"fake image bytes"
+        encoded = base64.b64encode(raw).decode()
+        expected = {"message": "File uploaded", "data": {"name": "photo.webp", "url": "https://cdn.example.com/photo.webp"}}
+
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
+                new=AsyncMock(return_value=expected),
+            ) as upload,
+        ):
+            result = await upload_article_file(
+                article_id="art-1",
+                file_name="photo.png",
+                file_base64=encoded,
+            )
+
+        self.assertIs(result, expected)
+        upload.assert_awaited_once_with(
+            access_token="upload-token",
+            article_id="art-1",
+            file_name="photo.png",
+            file_bytes=raw,
+            convert_to_webp=True,
+        )
+
+    async def test_convert_to_webp_defaults_true_and_forwarded(self) -> None:
+        raw = b"bytes"
+        encoded = base64.b64encode(raw).decode()
+
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
+                new=AsyncMock(return_value={}),
+            ) as upload,
+        ):
+            await upload_article_file(
+                article_id="art-1",
+                file_name="img.png",
+                file_base64=encoded,
+                convert_to_webp=False,
+            )
+
+        _call_kwargs = upload.call_args.kwargs
+        self.assertFalse(_call_kwargs["convert_to_webp"])
+
+    async def test_invalid_base64_raises_tool_error(self) -> None:
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+        ):
+            with self.assertRaises(ToolError) as ctx:
+                await upload_article_file(
+                    article_id="art-1",
+                    file_name="img.png",
+                    file_base64="!!!not-valid-base64!!!",
+                )
+        self.assertIn("base64", str(ctx.exception).lower())
+
+    async def test_requires_files_create_scope(self) -> None:
+        token = self._token(scopes=["articles:read"])
+        raw = base64.b64encode(b"x").decode()
+
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=token),
+        ):
+            with self.assertRaises(ToolError) as ctx:
+                await upload_article_file(
+                    article_id="art-1",
+                    file_name="img.png",
+                    file_base64=raw,
+                )
+        self.assertIn("articles:files:create", str(ctx.exception))
+
+
+class ListArticleFilesTests(unittest.IsolatedAsyncioTestCase):
+    def _token(self, scopes=None):
+        return SimpleNamespace(
+            token="list-token",
+            subject="user-1",
+            scopes=scopes or ["articles:files:list"],
+        )
+
+    async def test_forwards_article_id_and_token(self) -> None:
+        expected = {
+            "message": "Article files retrieved",
+            "data": [{"name": "doc.pdf", "url": "https://cdn.example.com/doc.pdf", "is_image": False}],
+        }
+
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.list_article_files",
+                new=AsyncMock(return_value=expected),
+            ) as list_files,
+        ):
+            result = await list_article_files(article_id="art-99")
+
+        self.assertIs(result, expected)
+        list_files.assert_awaited_once_with(access_token="list-token", article_id="art-99")
+
+    async def test_requires_files_list_scope(self) -> None:
+        token = self._token(scopes=["articles:read"])
+
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=token),
+        ):
+            with self.assertRaises(ToolError) as ctx:
+                await list_article_files(article_id="art-99")
+        self.assertIn("articles:files:list", str(ctx.exception))
+
+
+class RenameArticleFileTests(unittest.IsolatedAsyncioTestCase):
+    def _token(self, scopes=None):
+        return SimpleNamespace(
+            token="rename-token",
+            subject="user-1",
+            scopes=scopes or ["articles:files:create"],
+        )
+
+    async def test_forwards_all_arguments(self) -> None:
+        expected = {"message": "File renamed", "data": {"name": "better-name.pdf"}}
+
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.rename_article_file",
+                new=AsyncMock(return_value=expected),
+            ) as rename,
+        ):
+            result = await rename_article_file(
+                article_id="art-7",
+                file_name="old-name.pdf",
+                new_name="better-name.pdf",
+            )
+
+        self.assertIs(result, expected)
+        rename.assert_awaited_once_with(
+            access_token="rename-token",
+            article_id="art-7",
+            file_name="old-name.pdf",
+            new_name="better-name.pdf",
+        )
+
+    async def test_qapp_client_error_becomes_tool_error(self) -> None:
+        with (
+            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.rename_article_file",
+                new=AsyncMock(side_effect=QAppClientError("qApp returned HTTP 404: File not found")),
+            ),
+        ):
+            with self.assertRaises(ToolError) as ctx:
+                await rename_article_file(
+                    article_id="art-7",
+                    file_name="missing.pdf",
+                    new_name="new.pdf",
+                )
+        self.assertIn("404", str(ctx.exception))
 
 
 if __name__ == "__main__":

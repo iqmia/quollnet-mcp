@@ -18,9 +18,12 @@ from quollnet_mcp.tools.articles import (
     edit_article_draft,
     get_article,
     get_internal_link_candidates,
+    list_article_files,
+    rename_article_file,
     replace_article_body_text,
     search_articles,
     get_article_authoring_policy,
+    upload_article_file,
 )
 from mcp.server.transport_security import TransportSecuritySettings
 
@@ -220,11 +223,19 @@ mcp.tool(
     name="replace_article_body_text",
     title="Replace text in Quollnet article draft",
     description=(
-        "Replace one exact piece of text in an unpublished Quollnet article draft "
-        "without resending the full article body. Use this for small wording changes, "
-        "URL substitutions, or replacing download placeholders. The old text must "
-        "occur exactly once. Use edit_article_draft for substantial edits or changes "
-        "that must also update authoring metadata."
+        "Make a localized edit to an unpublished Quollnet article draft without "
+        "resending the full article body. The old_text must match exactly once. "
+        "Use the smallest unique exact fragment that safely identifies the edit "
+        "location. old_text may be the content being changed or a unique anchor "
+        "used to insert content before or after it. To insert after an anchor, "
+        "include the original anchor followed by the new HTML in new_text. To "
+        "insert before an anchor, place the new HTML before the original anchor. "
+        "When using an anchor only as an insertion point, preserve that anchor "
+        "exactly in new_text. For formatting changes, replace the complete HTML "
+        "element being restyled. Use this tool for small wording changes, local "
+        "section additions, formatting changes, URL substitutions, and download "
+        "placeholder replacement. Use edit_article_draft for substantial rewrites "
+        "or changes that must also update authoring metadata."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False,
@@ -242,6 +253,92 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article text updated",
     },
 )(replace_article_body_text)
+
+
+mcp.tool(
+    name="upload_article_file",
+    title="Upload Quollnet article file",
+    description=(
+        "Upload a file to a Quollnet article's file folder. Images are converted to "
+        "WebP by qApp by default; set convert_to_webp=false when the original image "
+        "format must be preserved. The returned filename and URL are authoritative "
+        "because image conversion may change the filename extension. Use "
+        "list_article_files afterwards when file discovery is needed."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:files:create"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Uploading article file",
+        "openai/toolInvocation/invoked": "Article file uploaded",
+    },
+)(upload_article_file)
+
+
+mcp.tool(
+    name="list_article_files",
+    title="List Quollnet article files",
+    description=(
+        "List files stored for a Quollnet article, including each file's exact stored "
+        "filename, permanent URL, and whether it is an image. Use this before referring "
+        "to, renaming, embedding, or linking an existing article file. For requests "
+        "such as 'insert file X after section B', first use this tool to resolve the "
+        "actual stored filename and URL, then use replace_article_body_text to insert "
+        "the appropriate HTML at a unique article-body anchor."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:files:list"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Retrieving article files",
+        "openai/toolInvocation/invoked": "Article files retrieved",
+    },
+)(list_article_files)
+
+
+mcp.tool(
+    name="rename_article_file",
+    title="Rename Quollnet article file",
+    description=(
+        "Rename an existing file in a Quollnet article folder, typically to improve "
+        "clarity or SEO. Use list_article_files first to obtain the exact current "
+        "filename. qApp automatically updates exact permanent-file URL references in "
+        "the article body, including download links and embedded images, and updates "
+        "the hero URL when applicable. Do not manually patch those file URLs after a "
+        "successful rename unless the user also requested surrounding content changes."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:files:create"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Renaming article file",
+        "openai/toolInvocation/invoked": "Article file renamed",
+    },
+)(rename_article_file)
 
 
 # Define a health check endpoint that returns the current service status in JSON format.

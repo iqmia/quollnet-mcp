@@ -1,3 +1,4 @@
+import base64
 from typing import Annotated, Any, Literal
 
 from mcp.server.auth.middleware.auth_context import get_access_token
@@ -653,6 +654,174 @@ async def replace_article_body_text(
             article_id=article_id,
             old_text=old_text,
             new_text=new_text,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def upload_article_file(
+    article_id: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=250,
+            description="ID of the article to upload the file to.",
+        ),
+    ],
+    file_name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description=(
+                "Desired filename for the upload, before any qApp WebP conversion. "
+                "The returned filename may differ if conversion changes the extension."
+            ),
+        ),
+    ],
+    file_base64: Annotated[
+        str,
+        Field(
+            min_length=1,
+            description=(
+                "Base64-encoded raw file bytes. Do not include a data-URI prefix "
+                "such as 'data:image/png;base64,' — provide the base64 content only."
+            ),
+        ),
+    ],
+    convert_to_webp: Annotated[
+        bool,
+        Field(
+            description=(
+                "When True (default) qApp converts images to WebP at quality 70. "
+                "Set to False to preserve the original image format."
+            ),
+        ),
+    ] = True,
+) -> dict[str, Any]:
+    """Upload a file to a Quollnet article's file folder. Images are converted to
+    WebP by qApp by default; set convert_to_webp=false when the original image
+    format must be preserved. The returned filename and URL are authoritative
+    because image conversion may change the filename extension. Use
+    list_article_files afterwards when file discovery is needed."""
+    access_token = get_access_token()
+
+    if access_token is None or not access_token.subject:
+        raise ToolError("Authentication is required")
+
+    scopes = set(access_token.scopes or [])
+    if "articles:files:create" not in scopes:
+        raise ToolError(
+            "The connected account does not have articles:files:create permission"
+        )
+
+    try:
+        file_bytes = base64.b64decode(file_base64, validate=True)
+    except Exception as error:
+        raise ToolError("Invalid base64 file content") from error
+
+    if not file_bytes:
+        raise ToolError("Uploaded file is empty")
+
+    try:
+        return await qapp_client.upload_article_file(
+            access_token=access_token.token,
+            article_id=article_id,
+            file_name=file_name,
+            file_bytes=file_bytes,
+            convert_to_webp=convert_to_webp,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def list_article_files(
+    article_id: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=250,
+            description="ID of the article whose files to list.",
+        ),
+    ],
+) -> dict[str, Any]:
+    """List files stored for a Quollnet article, including each file's exact stored
+    filename, permanent URL, and whether it is an image. Use this before referring
+    to, renaming, embedding, or linking an existing article file. For requests
+    such as 'insert file X after section B', first use this tool to resolve the
+    actual stored filename and URL, then use replace_article_body_text to insert
+    the appropriate HTML at a unique article-body anchor."""
+    access_token = get_access_token()
+
+    if access_token is None or not access_token.subject:
+        raise ToolError("Authentication is required")
+
+    scopes = set(access_token.scopes or [])
+    if "articles:files:list" not in scopes:
+        raise ToolError(
+            "The connected account does not have articles:files:list permission"
+        )
+
+    try:
+        return await qapp_client.list_article_files(
+            access_token=access_token.token,
+            article_id=article_id,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def rename_article_file(
+    article_id: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=250,
+            description="ID of the article that owns the file.",
+        ),
+    ],
+    file_name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description=(
+                "Current stored filename, as returned by list_article_files."
+            ),
+        ),
+    ],
+    new_name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description="New filename for the file.",
+        ),
+    ],
+) -> dict[str, Any]:
+    """Rename an existing file in a Quollnet article folder, typically to improve
+    clarity or SEO. Use list_article_files first to obtain the exact current
+    filename. qApp automatically updates exact permanent-file URL references in
+    the article body, including download links and embedded images, and updates
+    the hero URL when applicable. Do not manually patch those file URLs after a
+    successful rename unless the user also requested surrounding content changes."""
+    access_token = get_access_token()
+
+    if access_token is None or not access_token.subject:
+        raise ToolError("Authentication is required")
+
+    scopes = set(access_token.scopes or [])
+    if "articles:files:create" not in scopes:
+        raise ToolError(
+            "The connected account does not have articles:files:create permission"
+        )
+
+    try:
+        return await qapp_client.rename_article_file(
+            access_token=access_token.token,
+            article_id=article_id,
+            file_name=file_name,
+            new_name=new_name,
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error

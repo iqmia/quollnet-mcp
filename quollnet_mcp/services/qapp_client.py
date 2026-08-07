@@ -1,3 +1,5 @@
+import mimetypes
+import urllib.parse
 from collections.abc import Mapping
 from types import TracebackType
 from typing import Any
@@ -293,5 +295,113 @@ class QAppClient:
                 "old_text": old_text,
                 "new_text": new_text,
             },
+            access_token=access_token,
+        )
+
+    async def post_file(
+        self,
+        path: str,
+        *,
+        file_name: str,
+        file_bytes: bytes,
+        form_data: Mapping[str, str] | None = None,
+        access_token: str | None = None,
+    ) -> Any:
+        """POST multipart/form-data with a single file field to qApp."""
+        if self._client is None:
+            raise QAppClientError(
+                "QAppClient must be used as an async context manager"
+            )
+
+        headers = (
+            {"Authorization": f"Bearer {access_token}"}
+            if access_token
+            else None
+        )
+
+        mime_type, _ = mimetypes.guess_type(file_name)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
+        files = {"file": (file_name, file_bytes, mime_type)}
+
+        try:
+            response = await self._client.post(
+                path,
+                files=files,
+                data=dict(form_data) if form_data else None,
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+
+        except httpx.HTTPStatusError as error:
+            detail = None
+            try:
+                response_data = error.response.json()
+                if isinstance(response_data, Mapping):
+                    candidate = (
+                        response_data.get("message")
+                        or response_data.get("error")
+                    )
+                    if isinstance(candidate, str) and candidate.strip():
+                        detail = candidate.strip()
+            except ValueError:
+                pass
+
+            message = f"qApp returned HTTP {error.response.status_code}"
+            if detail:
+                message = f"{message}: {detail}"
+            raise QAppClientError(message) from error
+
+        except httpx.RequestError as error:
+            raise QAppClientError("qApp request failed") from error
+
+        except ValueError as error:
+            raise QAppClientError("qApp returned invalid JSON") from error
+
+    async def upload_article_file(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+        file_name: str,
+        file_bytes: bytes,
+        convert_to_webp: bool = True,
+    ) -> Any:
+        """Upload a file to a Quollnet article's file folder."""
+        return await self.post_file(
+            f"/articles/api/v1/articles/{article_id}/files",
+            file_name=file_name,
+            file_bytes=file_bytes,
+            form_data={"convert-to-webp": "yes" if convert_to_webp else "no"},
+            access_token=access_token,
+        )
+
+    async def list_article_files(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+    ) -> Any:
+        """List files stored for a Quollnet article."""
+        return await self.get_json(
+            f"/articles/api/v1/articles/{article_id}/files",
+            access_token=access_token,
+        )
+
+    async def rename_article_file(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+        file_name: str,
+        new_name: str,
+    ) -> Any:
+        """Rename an existing file in a Quollnet article folder."""
+        safe_name = urllib.parse.quote(file_name, safe="")
+        return await self.patch_json(
+            f"/articles/api/v1/articles/{article_id}/files/{safe_name}",
+            payload={"new_name": new_name},
             access_token=access_token,
         )
