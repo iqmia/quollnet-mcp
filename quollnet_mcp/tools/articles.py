@@ -811,9 +811,9 @@ async def rename_article_file(
         raise ToolError("Authentication is required")
 
     scopes = set(access_token.scopes or [])
-    if "articles:files:create" not in scopes:
+    if "articles:files:update" not in scopes:
         raise ToolError(
-            "The connected account does not have articles:files:create permission"
+            "The connected account does not have articles:files:update permission"
         )
 
     try:

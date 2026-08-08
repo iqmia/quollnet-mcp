@@ -785,7 +785,7 @@ class RenameArticleFileTests(unittest.IsolatedAsyncioTestCase):
         return SimpleNamespace(
             token="rename-token",
             subject="user-1",
-            scopes=scopes or ["articles:files:create"],
+            scopes=scopes or ["articles:files:update"],
         )
 
     async def test_forwards_all_arguments(self) -> None:
