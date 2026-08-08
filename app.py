@@ -23,6 +23,7 @@ from quollnet_mcp.tools.articles import (
     replace_article_body_text,
     search_articles,
     get_article_authoring_policy,
+    set_article_hero_image,
     upload_article_file,
 )
 from mcp.server.transport_security import TransportSecuritySettings
@@ -339,6 +340,34 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article file renamed",
     },
 )(rename_article_file)
+
+
+mcp.tool(
+    name="set_article_hero_image",
+    title="Set Quollnet article hero image",
+    description=(
+        "Assign an existing article file as the hero image for a Quollnet article. "
+        "The file must already exist in that article's file folder; use "
+        "list_article_files first when the exact stored filename is not already known. "
+        "This only assigns the hero image and does not insert the image into the "
+        "article body. Do not use replace_article_body_text for hero image assignment."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["articles:files:update"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Setting article hero image",
+        "openai/toolInvocation/invoked": "Article hero image updated",
+    },
+)(set_article_hero_image)
 
 
 # Define a health check endpoint that returns the current service status in JSON format.

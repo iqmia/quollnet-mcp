@@ -405,3 +405,17 @@ class QAppClient:
             payload={"new_name": new_name},
             access_token=access_token,
         )
+
+    async def set_article_hero_image(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+        file_name: str,
+    ) -> Any:
+        """Assign an existing article file as the article hero image."""
+        return await self.patch_json(
+            f"/articles/api/v1/articles/{article_id}/hero",
+            payload={"file_name": file_name},
+            access_token=access_token,
+        )

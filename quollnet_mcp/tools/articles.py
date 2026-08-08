@@ -825,3 +825,50 @@ async def rename_article_file(
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
+
+
+async def set_article_hero_image(
+    article_id: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=250,
+            description="ID of the article to set the hero image for.",
+        ),
+    ],
+    file_name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=500,
+            description=(
+                "Exact stored filename of the image to use as the hero, "
+                "as returned by list_article_files."
+            ),
+        ),
+    ],
+) -> dict[str, Any]:
+    """Set the hero image for a Quollnet article. The file must already exist in
+    that article's file folder — use list_article_files first when the exact stored
+    filename is not already known. This only assigns the hero image; it does not
+    insert the image into the article body. Do not use replace_article_body_text
+    for hero image assignment."""
+    access_token = get_access_token()
+
+    if access_token is None or not access_token.subject:
+        raise ToolError("Authentication is required")
+
+    scopes = set(access_token.scopes or [])
+    if "articles:files:update" not in scopes:
+        raise ToolError(
+            "The connected account does not have articles:files:update permission"
+        )
+
+    try:
+        return await qapp_client.set_article_hero_image(
+            access_token=access_token.token,
+            article_id=article_id,
+            file_name=file_name,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
