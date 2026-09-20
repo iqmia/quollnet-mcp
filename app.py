@@ -10,9 +10,13 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-from quollnet_mcp.dependencies import qapp_client
+from quollnet_mcp.dependencies import qapp_client, qauth_client, qflow_client
 from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
+from quollnet_mcp.tools.cashflowpot import (
+    create_cashflow,
+    list_cashflow_projects,
+)
 from quollnet_mcp.tools.articles import (
     create_article_draft,
     edit_article_draft,
@@ -370,6 +374,48 @@ mcp.tool(
 )(set_article_hero_image)
 
 
+mcp.tool(
+    name="list_cashflow_projects",
+    title="List CashflowPot projects",
+    description=(
+        "List the authenticated user's CashflowPot projects (QAuth Units) and "
+        "their existing cashflow scenarios. Use the returned project id as the "
+        "unit_id for CashflowPot creation tools."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "openai/toolInvocation/invoking": "Retrieving CashflowPot projects",
+        "openai/toolInvocation/invoked": "CashflowPot projects retrieved",
+    },
+)(list_cashflow_projects)
+
+
+mcp.tool(
+    name="create_cashflow",
+    title="Create CashflowPot scenario",
+    description=(
+        "Create and calculate a CashflowPot scenario in an existing project. "
+        "Provide project commercial assumptions and activities using the "
+        "CashflowPot portable input model. Percentages are fractions (0.10 = 10%). "
+        "q_flow validates the inputs and remains authoritative for all calculated "
+        "cashflow series and KPIs."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "openai/toolInvocation/invoking": "Creating CashflowPot scenario",
+        "openai/toolInvocation/invoked": "CashflowPot scenario created",
+    },
+)(create_cashflow)
+
+
 # Define a health check endpoint that returns the current service status in JSON format.
 async def health(_: Request) -> JSONResponse:
     return JSONResponse(await server_status())
@@ -398,8 +444,10 @@ mcp_http_app = mcp.streamable_http_app(
 @asynccontextmanager
 async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
     async with qapp_client:
-        async with mcp.session_manager.run():
-            yield
+        async with qauth_client:
+            async with qflow_client:
+                async with mcp.session_manager.run():
+                    yield
 
 # Define the ASGI application with the health check endpoint and the MCP server routes.
 app = Starlette(
