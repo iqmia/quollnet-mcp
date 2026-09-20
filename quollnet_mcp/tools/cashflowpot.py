@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver.exceptions import ToolError
@@ -9,26 +9,23 @@ from quollnet_mcp.services.qauth_client import QAuthClientError
 from quollnet_mcp.services.qflow_client import QFlowClientError
 
 
-ActivityType = Literal[
-    "General",
-    "Structure",
-    "MEP",
-    "Facade",
-    "Finishes",
-    "Landscape",
-    "Infrastructure",
-    "Other",
-    "Linear",
-]
-
-
 class CashflowActivityInput(BaseModel):
     """One activity in the portable CashflowPot input model."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: Annotated[str, Field(min_length=1, max_length=64)]
-    activity_type: ActivityType = "General"
+    activity_type: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=64,
+            description=(
+                "Activity category/type. Known q_flow presets may supply a default "
+                "skew; other descriptive values remain valid."
+            ),
+        ),
+    ] = "General"
     cost: Annotated[float, Field(gt=0)]
     duration: Annotated[int, Field(gt=0)]
     duration_units: Annotated[str, Field(min_length=1, max_length=64)] = "Months"
