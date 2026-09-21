@@ -81,7 +81,7 @@ class QAppClient:
             return response.json()
         except httpx.HTTPStatusError as error:
             raise QAppClientError(
-                f"qApp returned HTTP {error.response.status_code}"
+                self._http_error_message(error)
             ) from error
         except httpx.RequestError as error:
             raise QAppClientError("qApp request failed") from error
@@ -151,27 +151,9 @@ class QAppClient:
             return response.json()
 
         except httpx.HTTPStatusError as error:
-            detail = None
-
-            try:
-                response_data = error.response.json()
-                if isinstance(response_data, Mapping):
-                    candidate = (
-                        response_data.get("message")
-                        or response_data.get("error")
-                    )
-                    if isinstance(candidate, str) and candidate.strip():
-                        detail = candidate.strip()
-            except ValueError:
-                pass
-
-            message = (
-                f"qApp returned HTTP {error.response.status_code}"
-            )
-            if detail:
-                message = f"{message}: {detail}"
-
-            raise QAppClientError(message) from error
+            raise QAppClientError(
+                self._http_error_message(error)
+            ) from error
 
         except httpx.RequestError as error:
             raise QAppClientError("qApp request failed") from error
@@ -277,25 +259,9 @@ class QAppClient:
             return response.json()
 
         except httpx.HTTPStatusError as error:
-            detail = None
-
-            try:
-                response_data = error.response.json()
-                if isinstance(response_data, Mapping):
-                    candidate = (
-                        response_data.get("message")
-                        or response_data.get("error")
-                    )
-                    if isinstance(candidate, str) and candidate.strip():
-                        detail = candidate.strip()
-            except ValueError:
-                pass
-
-            message = f"qApp returned HTTP {error.response.status_code}"
-            if detail:
-                message = f"{message}: {detail}"
-
-            raise QAppClientError(message) from error
+            raise QAppClientError(
+                self._http_error_message(error)
+            ) from error
 
         except httpx.RequestError as error:
             raise QAppClientError("qApp request failed") from error
