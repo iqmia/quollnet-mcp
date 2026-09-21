@@ -37,6 +37,34 @@ class QAppClient:
             await self._client.aclose()
             self._client = None
 
+    @staticmethod
+    def _http_error_message(error: httpx.HTTPStatusError) -> str:
+        message = f"qApp returned HTTP {error.response.status_code}"
+
+        try:
+            payload = error.response.json()
+        except ValueError:
+            return message
+
+        if not isinstance(payload, Mapping):
+            return message
+
+        detail = payload.get("message") or payload.get("error")
+        if isinstance(detail, str) and detail.strip():
+            message = f"{message}: {detail.strip()}"
+
+        validation_errors = payload.get("errors")
+        if isinstance(validation_errors, list):
+            items = [
+                str(item).strip()
+                for item in validation_errors
+                if str(item).strip()
+            ]
+            if items:
+                message = f"{message}: {'; '.join(items)}"
+
+        return message
+
     async def get_json(
         self,
         path: str,
@@ -152,6 +180,74 @@ class QAppClient:
             raise QAppClientError(
                 "qApp returned invalid JSON"
             ) from error
+
+    async def put_json(
+        self,
+        path: str,
+        payload: Mapping[str, Any],
+        access_token: str | None = None,
+    ) -> Any:
+        """PUT a JSON payload to qApp and return its JSON response."""
+        if self._client is None:
+            raise QAppClientError(
+                "QAppClient must be used as an async context manager"
+            )
+
+        headers = (
+            {"Authorization": f"Bearer {access_token}"}
+            if access_token
+            else None
+        )
+
+        try:
+            response = await self._client.put(
+                path,
+                json=dict(payload),
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as error:
+            raise QAppClientError(
+                self._http_error_message(error)
+            ) from error
+        except httpx.RequestError as error:
+            raise QAppClientError("qApp request failed") from error
+        except ValueError as error:
+            raise QAppClientError("qApp returned invalid JSON") from error
+
+    async def delete_json(
+        self,
+        path: str,
+        access_token: str | None = None,
+    ) -> Any:
+        """DELETE one qApp resource and return its JSON response."""
+        if self._client is None:
+            raise QAppClientError(
+                "QAppClient must be used as an async context manager"
+            )
+
+        headers = (
+            {"Authorization": f"Bearer {access_token}"}
+            if access_token
+            else None
+        )
+
+        try:
+            response = await self._client.delete(
+                path,
+                headers=headers,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as error:
+            raise QAppClientError(
+                self._http_error_message(error)
+            ) from error
+        except httpx.RequestError as error:
+            raise QAppClientError("qApp request failed") from error
+        except ValueError as error:
+            raise QAppClientError("qApp returned invalid JSON") from error
 
     async def patch_json(
         self,
@@ -417,5 +513,181 @@ class QAppClient:
         return await self.patch_json(
             f"/articles/api/v1/articles/{article_id}/hero",
             payload={"file_name": file_name},
+            access_token=access_token,
+        )
+
+    # ------------------------------------------------------------------
+    # Quollnet qTools V2
+    # ------------------------------------------------------------------
+
+    async def get_qtool_generation_spec(
+        self,
+        *,
+        access_token: str,
+    ) -> Any:
+        return await self.get_json(
+            "/tools/api/v2/generation-spec",
+            access_token=access_token,
+        )
+
+    async def list_qtools(
+        self,
+        *,
+        access_token: str,
+        page: int = 1,
+        per_page: int = 25,
+        status: str | None = None,
+    ) -> Any:
+        params = {
+            "page": page,
+            "per_page": per_page,
+        }
+        if status is not None:
+            params["status"] = status
+
+        return await self.get_json(
+            "/tools/api/v2/",
+            params=params,
+            access_token=access_token,
+        )
+
+    async def get_qtool(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+    ) -> Any:
+        return await self.get_json(
+            f"/tools/api/v2/{slug}",
+            access_token=access_token,
+        )
+
+    async def create_qtool(
+        self,
+        *,
+        access_token: str,
+        payload: Mapping[str, Any],
+    ) -> Any:
+        return await self.post_json(
+            "/tools/api/v2/",
+            payload=payload,
+            access_token=access_token,
+        )
+
+    async def update_qtool_metadata(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        payload: Mapping[str, Any],
+    ) -> Any:
+        return await self.patch_json(
+            f"/tools/api/v2/{slug}",
+            payload=payload,
+            access_token=access_token,
+        )
+
+    async def list_qtool_files(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+    ) -> Any:
+        return await self.get_json(
+            f"/tools/api/v2/{slug}/files",
+            access_token=access_token,
+        )
+
+    async def get_qtool_file(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        relative_path: str,
+    ) -> Any:
+        safe_path = urllib.parse.quote(relative_path, safe="/")
+        return await self.get_json(
+            f"/tools/api/v2/{slug}/files/{safe_path}",
+            access_token=access_token,
+        )
+
+    async def write_qtool_file(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        relative_path: str,
+        payload: Mapping[str, Any],
+    ) -> Any:
+        safe_path = urllib.parse.quote(relative_path, safe="/")
+        return await self.put_json(
+            f"/tools/api/v2/{slug}/files/{safe_path}",
+            payload=payload,
+            access_token=access_token,
+        )
+
+    async def delete_qtool_file(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        relative_path: str,
+    ) -> Any:
+        safe_path = urllib.parse.quote(relative_path, safe="/")
+        return await self.delete_json(
+            f"/tools/api/v2/{slug}/files/{safe_path}",
+            access_token=access_token,
+        )
+
+    async def save_qtool(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+    ) -> Any:
+        return await self.post_json(
+            f"/tools/api/v2/{slug}/save",
+            payload={},
+            access_token=access_token,
+        )
+
+    async def publish_qtool(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        version: int | None = None,
+    ) -> Any:
+        payload = {}
+        if version is not None:
+            payload["version"] = version
+        return await self.post_json(
+            f"/tools/api/v2/{slug}/publish",
+            payload=payload,
+            access_token=access_token,
+        )
+
+    async def disable_qtool(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+    ) -> Any:
+        return await self.post_json(
+            f"/tools/api/v2/{slug}/disable",
+            payload={},
+            access_token=access_token,
+        )
+
+    async def set_qtool_indexing(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        indexed: bool,
+    ) -> Any:
+        return await self.patch_json(
+            f"/tools/api/v2/{slug}/indexing",
+            payload={"indexed": indexed},
             access_token=access_token,
         )
