@@ -26,7 +26,6 @@ class QToolMetadataInput(BaseModel):
     seo_title: Annotated[str | None, Field(max_length=255)] = None
     seo_description: Annotated[str | None, Field(max_length=2000)] = None
     keywords: Annotated[str | None, Field(max_length=2000)] = None
-    hero_image: Annotated[str | None, Field(max_length=255)] = None
     application_category: Annotated[str | None, Field(max_length=80)] = None
     operating_system: Annotated[str | None, Field(max_length=40)] = None
     login_required: bool | None = None
