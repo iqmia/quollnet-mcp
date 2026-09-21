@@ -17,6 +17,21 @@ from quollnet_mcp.tools.cashflowpot import (
     create_cashflow,
     list_cashflow_projects,
 )
+from quollnet_mcp.tools.qtools import (
+    create_qtool,
+    delete_qtool_file,
+    disable_qtool,
+    get_qtool,
+    get_qtool_file,
+    get_qtool_generation_spec,
+    list_qtool_files,
+    list_qtools,
+    publish_qtool,
+    save_qtool,
+    set_qtool_indexing,
+    update_qtool_metadata,
+    write_qtool_file,
+)
 from quollnet_mcp.tools.articles import (
     create_article_draft,
     edit_article_draft,
@@ -420,6 +435,287 @@ mcp.tool(
         "openai/toolInvocation/invoked": "CashflowPot scenario created",
     },
 )(create_cashflow)
+
+
+# Quollnet qTools V2
+
+mcp.tool(
+    name="get_qtool_generation_spec",
+    title="Get Quollnet qTool generation specification",
+    description=(
+        "Retrieve the authoritative qTools V2 package-generation rules from qApp. "
+        "Use this before creating or substantially modifying a qTool."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:read"]}
+        ],
+        "openai/toolInvocation/invoking": "Retrieving qTool rules",
+        "openai/toolInvocation/invoked": "qTool rules retrieved",
+    },
+)(get_qtool_generation_spec)
+
+
+mcp.tool(
+    name="list_qtools",
+    title="List Quollnet qTools",
+    description=(
+        "List qTools accessible to the authenticated user. Creators see their "
+        "own qTools; qApp admins can see all qTools."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:read"]}
+        ],
+        "openai/toolInvocation/invoking": "Retrieving qTools",
+        "openai/toolInvocation/invoked": "qTools retrieved",
+    },
+)(list_qtools)
+
+
+mcp.tool(
+    name="get_qtool",
+    title="Get Quollnet qTool",
+    description=(
+        "Retrieve qTool metadata, lifecycle state, preview URLs, and versions."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:read"]}
+        ],
+        "openai/toolInvocation/invoking": "Retrieving qTool",
+        "openai/toolInvocation/invoked": "qTool retrieved",
+    },
+)(get_qtool)
+
+
+mcp.tool(
+    name="create_qtool",
+    title="Create Quollnet qTool",
+    description=(
+        "Create a qTool record and mutable working v1. Retrieve the generation "
+        "specification first, then add package files with write_qtool_file."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:create"]}
+        ],
+        "openai/toolInvocation/invoking": "Creating qTool",
+        "openai/toolInvocation/invoked": "qTool created",
+    },
+)(create_qtool)
+
+
+mcp.tool(
+    name="update_qtool_metadata",
+    title="Update Quollnet qTool metadata",
+    description=(
+        "Update qTool metadata without changing package version history."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:edit"]}
+        ],
+        "openai/toolInvocation/invoking": "Updating qTool metadata",
+        "openai/toolInvocation/invoked": "qTool metadata updated",
+    },
+)(update_qtool_metadata)
+
+
+mcp.tool(
+    name="list_qtool_files",
+    title="List Quollnet qTool files",
+    description=(
+        "List files in the qTool working package, or latest saved package if no "
+        "working version exists."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:read"]}
+        ],
+        "openai/toolInvocation/invoking": "Retrieving qTool files",
+        "openai/toolInvocation/invoked": "qTool files retrieved",
+    },
+)(list_qtool_files)
+
+
+mcp.tool(
+    name="get_qtool_file",
+    title="Get Quollnet qTool file",
+    description=(
+        "Read one qTool package file. Binary package files are returned as base64."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:read"]}
+        ],
+        "openai/toolInvocation/invoking": "Retrieving qTool file",
+        "openai/toolInvocation/invoked": "qTool file retrieved",
+    },
+)(get_qtool_file)
+
+
+mcp.tool(
+    name="write_qtool_file",
+    title="Write Quollnet qTool file",
+    description=(
+        "Create or replace one file in the current qTool working package. "
+        "Repeated edits stay on the same working version until Save."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:edit"]}
+        ],
+        "openai/toolInvocation/invoking": "Writing qTool file",
+        "openai/toolInvocation/invoked": "qTool file updated",
+    },
+)(write_qtool_file)
+
+
+mcp.tool(
+    name="delete_qtool_file",
+    title="Delete Quollnet qTool file",
+    description="Delete one file from the current qTool working package.",
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:edit"]}
+        ],
+        "openai/toolInvocation/invoking": "Deleting qTool file",
+        "openai/toolInvocation/invoked": "qTool file deleted",
+    },
+)(delete_qtool_file)
+
+
+mcp.tool(
+    name="save_qtool",
+    title="Save Quollnet qTool version",
+    description=(
+        "Validate and save the current working qTool version. If validation "
+        "fails, use the returned errors to repair the same working version."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:edit"]}
+        ],
+        "openai/toolInvocation/invoking": "Validating and saving qTool",
+        "openai/toolInvocation/invoked": "qTool save complete",
+    },
+)(save_qtool)
+
+
+mcp.tool(
+    name="publish_qtool",
+    title="Publish Quollnet qTool",
+    description=(
+        "Publish a retained saved qTool version. qApp requires an admin role."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:publish"]}
+        ],
+        "openai/toolInvocation/invoking": "Publishing qTool",
+        "openai/toolInvocation/invoked": "qTool published",
+    },
+)(publish_qtool)
+
+
+mcp.tool(
+    name="disable_qtool",
+    title="Disable Quollnet qTool",
+    description=(
+        "Disable a qTool so ordinary users cannot access it. qApp requires an "
+        "admin role; creator/admin inspection remains available."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:publish"]}
+        ],
+        "openai/toolInvocation/invoking": "Disabling qTool",
+        "openai/toolInvocation/invoked": "qTool disabled",
+    },
+)(disable_qtool)
+
+
+mcp.tool(
+    name="set_qtool_indexing",
+    title="Set Quollnet qTool indexing",
+    description=(
+        "Control whether a published qTool is discoverable in the public Tools "
+        "library and SEO surfaces. qApp requires an admin role."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access", "qtools:publish"]}
+        ],
+        "openai/toolInvocation/invoking": "Updating qTool indexing",
+        "openai/toolInvocation/invoked": "qTool indexing updated",
+    },
+)(set_qtool_indexing)
 
 
 # Define a health check endpoint that returns the current service status in JSON format.
