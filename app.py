@@ -30,7 +30,14 @@ from quollnet_mcp.tools.articles import (
     set_article_hero_image,
     upload_article_file,
 )
-from quollnet_mcp.tools.qtools import get_qtool_development_guide
+from quollnet_mcp.tools.qtools import (
+    get_qtool,
+    get_qtool_development_guide,
+    get_qtool_file,
+    list_qtools,
+    update_qtool_file,
+    update_qtool_metadata,
+)
 from mcp.server.transport_security import TransportSecuritySettings
 
 
@@ -138,6 +145,134 @@ mcp.tool(
         "openai/toolInvocation/invoked": "qTool guide retrieved",
     },
 )(get_qtool_development_guide)
+
+
+mcp.tool(
+    name="list_qtools",
+    title="List Quollnet qTools",
+    description=(
+        "List qTools visible to the connected user, with optional lifecycle "
+        "status filtering. Use this to find the canonical slug before "
+        "inspecting or editing an existing qTool."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:read"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Listing qTools",
+        "openai/toolInvocation/invoked": "qTools listed",
+    },
+)(list_qtools)
+
+
+mcp.tool(
+    name="get_qtool",
+    title="Inspect Quollnet qTool",
+    description=(
+        "Inspect one qTool by slug, including metadata, retained versions, "
+        "preview/public URLs, and the current package file list. Read the "
+        "qTool development guide before making edits."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:read"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Inspecting qTool",
+        "openai/toolInvocation/invoked": "qTool inspected",
+    },
+)(get_qtool)
+
+
+mcp.tool(
+    name="get_qtool_file",
+    title="Read Quollnet qTool file",
+    description=(
+        "Read one file from an existing qTool package. Use get_qtool first "
+        "to discover the current package version and exact file paths."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:read"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Reading qTool file",
+        "openai/toolInvocation/invoked": "qTool file read",
+    },
+)(get_qtool_file)
+
+
+mcp.tool(
+    name="update_qtool_file",
+    title="Update Quollnet qTool file",
+    description=(
+        "Replace one file in an existing qTool's mutable working package. "
+        "This never publishes the tool. If the latest version is already "
+        "saved, qApp creates the next working version before applying the edit."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:edit"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Updating qTool file",
+        "openai/toolInvocation/invoked": "qTool file updated",
+    },
+)(update_qtool_file)
+
+
+mcp.tool(
+    name="update_qtool_metadata",
+    title="Update Quollnet qTool metadata",
+    description=(
+        "Update selected approved metadata fields for an existing qTool. "
+        "This does not save or publish a package version."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:edit"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Updating qTool metadata",
+        "openai/toolInvocation/invoked": "qTool metadata updated",
+    },
+)(update_qtool_metadata)
 
 
 mcp.tool(
