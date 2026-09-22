@@ -262,6 +262,102 @@ class QAppClient:
             access_token=access_token,
         )
 
+    async def list_qtools(
+        self,
+        *,
+        access_token: str,
+        status: str | None = None,
+        page: int = 1,
+        per_page: int = 25,
+    ) -> Any:
+        """List qTools visible to the authenticated qApp user."""
+        params = {
+            "page": page,
+            "per_page": per_page,
+        }
+        if status is not None:
+            params["status"] = status
+
+        return await self.get_json(
+            "/tools/api/v2/",
+            params=params,
+            access_token=access_token,
+        )
+
+    async def get_qtool(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+    ) -> Any:
+        """Retrieve one qTool including retained version metadata."""
+        return await self.get_json(
+            f"/tools/api/v2/{urllib.parse.quote(slug, safe='')}",
+            access_token=access_token,
+        )
+
+    async def list_qtool_files(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+    ) -> Any:
+        """List files in the qTool package selected for the next edit."""
+        return await self.get_json(
+            f"/tools/api/v2/{urllib.parse.quote(slug, safe='')}/files",
+            access_token=access_token,
+        )
+
+    async def get_qtool_file(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        relative_path: str,
+    ) -> Any:
+        """Retrieve one qTool package file."""
+        encoded_slug = urllib.parse.quote(slug, safe="")
+        encoded_path = urllib.parse.quote(relative_path, safe="/")
+        return await self.get_json(
+            f"/tools/api/v2/{encoded_slug}/files/{encoded_path}",
+            access_token=access_token,
+        )
+
+    async def update_qtool_file(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        relative_path: str,
+        content: str,
+        encoding: str = "utf-8",
+    ) -> Any:
+        """Write one file to the qTool working version."""
+        encoded_slug = urllib.parse.quote(slug, safe="")
+        encoded_path = urllib.parse.quote(relative_path, safe="/")
+        return await self.patch_json(
+            f"/tools/api/v2/{encoded_slug}/files/{encoded_path}",
+            payload={
+                "content": content,
+                "encoding": encoding,
+            },
+            access_token=access_token,
+        )
+
+    async def update_qtool_metadata(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        payload: Mapping[str, Any],
+    ) -> Any:
+        """Update approved qTool metadata fields."""
+        return await self.patch_json(
+            f"/tools/api/v2/{urllib.parse.quote(slug, safe='')}",
+            payload=payload,
+            access_token=access_token,
+        )
+
     # Get article tool
     async def get_article(
         self,
