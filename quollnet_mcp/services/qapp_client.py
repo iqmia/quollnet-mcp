@@ -251,6 +251,17 @@ class QAppClient:
             access_token=access_token,
         )
 
+    async def get_qtool_development_guide(
+        self,
+        *,
+        access_token: str,
+    ) -> Any:
+        """Retrieve the canonical qTools V2 development guide from qApp."""
+        return await self.get_json(
+            "/tools/api/v2/generation-spec",
+            access_token=access_token,
+        )
+
     # Get article tool
     async def get_article(
         self,
