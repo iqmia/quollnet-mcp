@@ -10,16 +10,27 @@ os.environ.setdefault("CASHFLOWPOT_APP_ID", "cashflowpot-test-app")
 
 from mcp.server.mcpserver.exceptions import ToolError
 from quollnet_mcp.services.qapp_client import QAppClientError
-from quollnet_mcp.tools.qtools import get_qtool_development_guide
+from quollnet_mcp.tools.qtools import (
+    QToolMetadataUpdate,
+    get_qtool,
+    get_qtool_development_guide,
+    get_qtool_file,
+    list_qtools,
+    update_qtool_file,
+    update_qtool_metadata,
+)
+
+
+def _token(*scopes: str):
+    return SimpleNamespace(
+        token="bearer-token",
+        subject="user-1",
+        scopes=list(scopes),
+    )
 
 
 class GetQToolDevelopmentGuideTests(unittest.IsolatedAsyncioTestCase):
     async def test_forwards_token_to_qapp(self) -> None:
-        token = SimpleNamespace(
-            token="bearer-token",
-            subject="user-1",
-            scopes=["qtools:read"],
-        )
         expected = {
             "spec_version": 1,
             "spec_format": "text/markdown",
@@ -29,7 +40,7 @@ class GetQToolDevelopmentGuideTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch(
                 "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=token,
+                return_value=_token("qtools:read"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.get_qtool_development_guide",
@@ -44,30 +55,18 @@ class GetQToolDevelopmentGuideTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_requires_qtools_read_scope(self) -> None:
-        token = SimpleNamespace(
-            token="bearer-token",
-            subject="user-1",
-            scopes=["articles:read"],
-        )
-
         with patch(
             "quollnet_mcp.tools.qtools.get_access_token",
-            return_value=token,
+            return_value=_token("articles:read"),
         ):
             with self.assertRaisesRegex(ToolError, "qtools:read"):
                 await get_qtool_development_guide()
 
     async def test_qapp_error_is_converted(self) -> None:
-        token = SimpleNamespace(
-            token="bearer-token",
-            subject="user-1",
-            scopes=["qtools:read"],
-        )
-
         with (
             patch(
                 "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=token,
+                return_value=_token("qtools:read"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.get_qtool_development_guide",
@@ -78,6 +77,242 @@ class GetQToolDevelopmentGuideTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.assertRaisesRegex(ToolError, "qApp unavailable"):
                 await get_qtool_development_guide()
+
+
+class ListQToolsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_forwards_filters_and_pagination(self) -> None:
+        expected = {
+            "data": [{"slug": "concrete-strength-calculator"}],
+            "pagination": {"page": 2},
+        }
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:read"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.list_qtools",
+                new=AsyncMock(return_value=expected),
+            ) as list_call,
+        ):
+            actual = await list_qtools(
+                status="published",
+                page=2,
+                per_page=10,
+            )
+
+        self.assertIs(actual, expected)
+        list_call.assert_awaited_once_with(
+            access_token="bearer-token",
+            status="published",
+            page=2,
+            per_page=10,
+        )
+
+
+class GetQToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_combines_tool_and_package_file_list(self) -> None:
+        tool_response = {
+            "data": {
+                "slug": "sample-tool",
+                "tool_name": "Sample Tool",
+                "versions": [{"version": 1, "state": "saved"}],
+            }
+        }
+        files_response = {
+            "data": {
+                "version": 1,
+                "state": "saved",
+                "files": [
+                    "core.html",
+                    "css/01-base.css",
+                    "js/01-ui.js",
+                ],
+            }
+        }
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:read"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.get_qtool",
+                new=AsyncMock(return_value=tool_response),
+            ) as get_call,
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.list_qtool_files",
+                new=AsyncMock(return_value=files_response),
+            ) as files_call,
+        ):
+            actual = await get_qtool("sample-tool")
+
+        self.assertEqual(actual["data"]["slug"], "sample-tool")
+        self.assertEqual(
+            actual["data"]["package"]["files"],
+            ["core.html", "css/01-base.css", "js/01-ui.js"],
+        )
+        get_call.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+        )
+        files_call.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+        )
+
+
+class GetQToolFileTests(unittest.IsolatedAsyncioTestCase):
+    async def test_reads_exact_package_path(self) -> None:
+        expected = {
+            "data": {
+                "path": "js/01-ui.js",
+                "encoding": "utf-8",
+                "content": "window.ready = true;",
+            }
+        }
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:read"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.get_qtool_file",
+                new=AsyncMock(return_value=expected),
+            ) as get_file,
+        ):
+            actual = await get_qtool_file(
+                "sample-tool",
+                "js/01-ui.js",
+            )
+
+        self.assertIs(actual, expected)
+        get_file.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+            relative_path="js/01-ui.js",
+        )
+
+
+class UpdateQToolFileTests(unittest.IsolatedAsyncioTestCase):
+    async def test_requires_edit_scope_and_forwards_content(self) -> None:
+        expected = {
+            "data": {
+                "path": "core.html",
+                "working_version": 2,
+            }
+        }
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:edit"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.update_qtool_file",
+                new=AsyncMock(return_value=expected),
+            ) as update_file,
+        ):
+            actual = await update_qtool_file(
+                "sample-tool",
+                "core.html",
+                '<section data-qtool="sample-tool"></section>',
+            )
+
+        self.assertIs(actual, expected)
+        update_file.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+            relative_path="core.html",
+            content='<section data-qtool="sample-tool"></section>',
+            encoding="utf-8",
+        )
+
+    async def test_read_scope_is_not_enough(self) -> None:
+        with patch(
+            "quollnet_mcp.tools.qtools.get_access_token",
+            return_value=_token("qtools:read"),
+        ):
+            with self.assertRaisesRegex(ToolError, "qtools:edit"):
+                await update_qtool_file(
+                    "sample-tool",
+                    "core.html",
+                    "<section></section>",
+                )
+
+
+class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
+    async def test_sends_only_supplied_fields(self) -> None:
+        expected = {
+            "data": {
+                "slug": "sample-tool",
+                "description": "Updated description",
+                "article_embed_allowed": True,
+            }
+        }
+        metadata = QToolMetadataUpdate(
+            description="Updated description",
+            article_embed_allowed=True,
+        )
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:edit"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.update_qtool_metadata",
+                new=AsyncMock(return_value=expected),
+            ) as update_meta,
+        ):
+            actual = await update_qtool_metadata(
+                "sample-tool",
+                metadata,
+            )
+
+        self.assertIs(actual, expected)
+        update_meta.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+            payload={
+                "description": "Updated description",
+                "article_embed_allowed": True,
+            },
+        )
+
+    async def test_explicit_null_can_clear_optional_metadata(self) -> None:
+        metadata = QToolMetadataUpdate(description=None)
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:edit"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.update_qtool_metadata",
+                new=AsyncMock(return_value={"data": {}}),
+            ) as update_meta,
+        ):
+            await update_qtool_metadata("sample-tool", metadata)
+
+        update_meta.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+            payload={"description": None},
+        )
+
+    async def test_empty_metadata_update_is_rejected(self) -> None:
+        with patch(
+            "quollnet_mcp.tools.qtools.get_access_token",
+            return_value=_token("qtools:edit"),
+        ):
+            with self.assertRaisesRegex(ToolError, "At least one"):
+                await update_qtool_metadata(
+                    "sample-tool",
+                    QToolMetadataUpdate(),
+                )
 
 
 if __name__ == "__main__":
