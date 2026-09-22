@@ -30,6 +30,7 @@ from quollnet_mcp.tools.articles import (
     set_article_hero_image,
     upload_article_file,
 )
+from quollnet_mcp.tools.qtools import get_qtool_development_guide
 from mcp.server.transport_security import TransportSecuritySettings
 
 
@@ -112,6 +113,31 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article policy retrieved",
     },
 )(get_article_authoring_policy)
+
+
+mcp.tool(
+    name="get_qtool_development_guide",
+    title="Get Quollnet qTool development guide",
+    description=(
+        "Retrieve the current canonical Quollnet Tools V2 development guide "
+        "from qApp. Use it before creating or editing a qTool."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:read"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Retrieving qTool guide",
+        "openai/toolInvocation/invoked": "qTool guide retrieved",
+    },
+)(get_qtool_development_guide)
 
 
 mcp.tool(
