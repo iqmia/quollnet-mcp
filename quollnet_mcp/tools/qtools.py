@@ -224,3 +224,50 @@ async def update_qtool_metadata(
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
+
+
+async def save_qtool(
+    slug: Annotated[
+        str,
+        Field(min_length=1, max_length=80, pattern=_QTOOL_SLUG),
+    ],
+) -> dict[str, Any]:
+    """Validate and freeze the current qTool working version without publishing it."""
+    access_token = _require_scope("qtools:edit")
+
+    try:
+        return await qapp_client.save_qtool(
+            access_token=access_token.token,
+            slug=slug,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def publish_qtool(
+    slug: Annotated[
+        str,
+        Field(min_length=1, max_length=80, pattern=_QTOOL_SLUG),
+    ],
+    version: Annotated[
+        int | None,
+        Field(
+            ge=1,
+            description=(
+                "Optional saved version to publish. Omit to publish the latest "
+                "saved version. qApp still enforces its admin-only publish rule."
+            ),
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Publish a saved qTool version. qApp requires an authenticated app admin."""
+    access_token = _require_scope("qtools:publish")
+
+    try:
+        return await qapp_client.publish_qtool(
+            access_token=access_token.token,
+            slug=slug,
+            version=version,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
