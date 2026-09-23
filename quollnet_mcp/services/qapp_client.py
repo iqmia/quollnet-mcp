@@ -358,6 +358,37 @@ class QAppClient:
             access_token=access_token,
         )
 
+    async def save_qtool(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+    ) -> Any:
+        """Validate and freeze the current qTool working version."""
+        return await self.post_json(
+            f"/tools/api/v2/{urllib.parse.quote(slug, safe='')}/save",
+            payload={},
+            access_token=access_token,
+        )
+
+    async def publish_qtool(
+        self,
+        *,
+        access_token: str,
+        slug: str,
+        version: int | None = None,
+    ) -> Any:
+        """Publish a saved qTool version through qApp."""
+        payload: dict[str, Any] = {}
+        if version is not None:
+            payload["version"] = version
+
+        return await self.post_json(
+            f"/tools/api/v2/{urllib.parse.quote(slug, safe='')}/publish",
+            payload=payload,
+            access_token=access_token,
+        )
+
     # Get article tool
     async def get_article(
         self,
