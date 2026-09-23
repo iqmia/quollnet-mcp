@@ -35,6 +35,8 @@ from quollnet_mcp.tools.qtools import (
     get_qtool_development_guide,
     get_qtool_file,
     list_qtools,
+    publish_qtool,
+    save_qtool,
     update_qtool_file,
     update_qtool_metadata,
 )
@@ -273,6 +275,58 @@ mcp.tool(
         "openai/toolInvocation/invoked": "qTool metadata updated",
     },
 )(update_qtool_metadata)
+
+
+mcp.tool(
+    name="save_qtool",
+    title="Save Quollnet qTool working version",
+    description=(
+        "Validate and freeze the current mutable qTool working version. "
+        "This does not publish the tool. Validation errors from qApp are "
+        "returned to the caller for correction."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:edit"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Saving qTool version",
+        "openai/toolInvocation/invoked": "qTool version saved",
+    },
+)(save_qtool)
+
+
+mcp.tool(
+    name="publish_qtool",
+    title="Publish Quollnet qTool version",
+    description=(
+        "Publish a saved qTool version. qApp independently enforces its "
+        "admin-only publish rule. Omit version to publish the latest saved "
+        "version, or provide a retained saved version explicitly."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["quollnet:access", "qtools:publish"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Publishing qTool",
+        "openai/toolInvocation/invoked": "qTool published",
+    },
+)(publish_qtool)
 
 
 mcp.tool(
