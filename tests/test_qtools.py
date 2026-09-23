@@ -16,6 +16,8 @@ from quollnet_mcp.tools.qtools import (
     get_qtool_development_guide,
     get_qtool_file,
     list_qtools,
+    publish_qtool,
+    save_qtool,
     update_qtool_file,
     update_qtool_metadata,
 )
@@ -313,6 +315,101 @@ class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
                     "sample-tool",
                     QToolMetadataUpdate(),
                 )
+
+
+class SaveQToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_requires_edit_scope_and_forwards_slug(self) -> None:
+        expected = {
+            "data": {
+                "slug": "sample-tool",
+                "saved_version": 2,
+            }
+        }
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:edit"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.save_qtool",
+                new=AsyncMock(return_value=expected),
+            ) as save_call,
+        ):
+            actual = await save_qtool("sample-tool")
+
+        self.assertIs(actual, expected)
+        save_call.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+        )
+
+    async def test_read_scope_is_not_enough(self) -> None:
+        with patch(
+            "quollnet_mcp.tools.qtools.get_access_token",
+            return_value=_token("qtools:read"),
+        ):
+            with self.assertRaisesRegex(ToolError, "qtools:edit"):
+                await save_qtool("sample-tool")
+
+
+class PublishQToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_requires_publish_scope_and_forwards_version(self) -> None:
+        expected = {
+            "data": {
+                "slug": "sample-tool",
+                "published_version": 2,
+            }
+        }
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:publish"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.publish_qtool",
+                new=AsyncMock(return_value=expected),
+            ) as publish_call,
+        ):
+            actual = await publish_qtool(
+                "sample-tool",
+                version=2,
+            )
+
+        self.assertIs(actual, expected)
+        publish_call.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+            version=2,
+        )
+
+    async def test_version_may_be_omitted(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.get_access_token",
+                return_value=_token("qtools:publish"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.publish_qtool",
+                new=AsyncMock(return_value={"data": {}}),
+            ) as publish_call,
+        ):
+            await publish_qtool("sample-tool")
+
+        publish_call.assert_awaited_once_with(
+            access_token="bearer-token",
+            slug="sample-tool",
+            version=None,
+        )
+
+    async def test_edit_scope_is_not_enough(self) -> None:
+        with patch(
+            "quollnet_mcp.tools.qtools.get_access_token",
+            return_value=_token("qtools:edit"),
+        ):
+            with self.assertRaisesRegex(ToolError, "qtools:publish"):
+                await publish_qtool("sample-tool")
 
 
 if __name__ == "__main__":
