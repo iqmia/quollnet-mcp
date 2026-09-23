@@ -105,6 +105,89 @@ class BackendClientTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
+    async def test_qapp_save_qtool_uses_save_route(self) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["method"] = request.method
+            seen["path"] = request.url.path
+            seen["authorization"] = request.headers.get("Authorization")
+            seen["json"] = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "slug": "sample-tool",
+                        "saved_version": 2,
+                    }
+                },
+            )
+
+        client = QAppClient()
+        client._client = httpx.AsyncClient(
+            base_url="https://quollnet.com",
+            transport=httpx.MockTransport(handler),
+        )
+        try:
+            result = await client.save_qtool(
+                access_token="mcp-token",
+                slug="sample-tool",
+            )
+        finally:
+            await client._client.aclose()
+            client._client = None
+
+        self.assertEqual(result["data"]["saved_version"], 2)
+        self.assertEqual(seen["method"], "POST")
+        self.assertEqual(
+            seen["path"],
+            "/tools/api/v2/sample-tool/save",
+        )
+        self.assertEqual(seen["authorization"], "Bearer mcp-token")
+        self.assertEqual(seen["json"], {})
+
+    async def test_qapp_publish_qtool_forwards_explicit_version(self) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["method"] = request.method
+            seen["path"] = request.url.path
+            seen["authorization"] = request.headers.get("Authorization")
+            seen["json"] = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "slug": "sample-tool",
+                        "published_version": 2,
+                    }
+                },
+            )
+
+        client = QAppClient()
+        client._client = httpx.AsyncClient(
+            base_url="https://quollnet.com",
+            transport=httpx.MockTransport(handler),
+        )
+        try:
+            result = await client.publish_qtool(
+                access_token="mcp-token",
+                slug="sample-tool",
+                version=2,
+            )
+        finally:
+            await client._client.aclose()
+            client._client = None
+
+        self.assertEqual(result["data"]["published_version"], 2)
+        self.assertEqual(seen["method"], "POST")
+        self.assertEqual(
+            seen["path"],
+            "/tools/api/v2/sample-tool/publish",
+        )
+        self.assertEqual(seen["authorization"], "Bearer mcp-token")
+        self.assertEqual(seen["json"], {"version": 2})
+
     async def test_qauth_exchange_uses_bearer_and_exchange_route(self) -> None:
         seen = {}
 
