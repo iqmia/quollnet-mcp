@@ -60,7 +60,7 @@ mcp = MCPServer(
     auth=AuthSettings(
         issuer_url=settings.qauth_issuer_url,
         resource_server_url=settings.mcp_resource_uri,
-        required_scopes=["quollnet:access"],
+        required_scopes=["mcp:connect"],
     ),
 )
 
@@ -88,7 +88,7 @@ mcp.tool(
     ),
     meta={
         "securitySchemes": [
-            {"type": "oauth2", "scopes": ["quollnet:access"]}
+            {"type": "oauth2", "scopes": ["mcp:connect"]}
         ],
         "openai/toolInvocation/invoking": "Checking connected Quollnet user",
         "openai/toolInvocation/invoked": "Connected Quollnet user retrieved",
@@ -111,16 +111,15 @@ mcp.tool(
         open_world_hint=False,
     ),
     meta={
-        "securitySchemes": [{"type": "oauth2", "scopes": ["quollnet:access", "articles:read"]}],
+        "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
         "openai/toolInvocation/invoking": "Searching articles",
         "openai/toolInvocation/invoked": "Article search complete",
     },
 )(search_articles)
 
 
-# Define the get_article_authoring_policy tool, which retrieves the current
-# authoritative Quollnet article-authoring policy from qApp. This tool requires the
-# "articles:read" scope for authorization.
+# Define the get_article_authoring_policy tool. qApp authorization is applied
+# after the MCP identity is exchanged into a normal qApp user token.
 mcp.tool(
     name="get_article_authoring_policy",
     title="Get Quollnet article-authoring policy",
@@ -138,7 +137,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:read"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Retrieving article policy",
@@ -163,7 +162,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Retrieving qTool guide",
@@ -189,7 +188,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Listing qTools",
@@ -215,7 +214,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Inspecting qTool",
@@ -240,7 +239,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Reading qTool file",
@@ -266,7 +265,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Updating qTool file",
@@ -291,7 +290,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Updating qTool metadata",
@@ -317,7 +316,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Saving qTool version",
@@ -343,7 +342,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Publishing qTool",
@@ -371,7 +370,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:read"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Finding related Quollnet content",
@@ -380,9 +379,8 @@ mcp.tool(
 )(get_internal_link_candidates)
 
 
-# Define the create_article_draft tool, which allows authenticated users to create
-# new article drafts in the Quollnet system. This tool requires the "articles:create"
-# scope for authorization.
+# Define the create_article_draft tool. qApp remains authoritative for whether
+# the exchanged user may create an article draft.
 mcp.tool(
     name="create_article_draft",
     title="Create Quollnet article draft",
@@ -401,7 +399,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:create"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Creating article draft",
@@ -426,7 +424,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:read"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Retrieving article",
@@ -453,7 +451,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:edit"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Updating article draft",
@@ -489,7 +487,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:edit"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Updating article text",
@@ -517,7 +515,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:files:create"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Uploading article file",
@@ -546,7 +544,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:files:list"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Retrieving article files",
@@ -575,7 +573,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:files:update"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Renaming article file",
@@ -603,7 +601,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "articles:files:update"],
+                "scopes": ["mcp:connect"],
             }
         ],
         "openai/toolInvocation/invoking": "Setting article hero image",
@@ -627,7 +625,7 @@ mcp.tool(
     ),
     meta={
         "securitySchemes": [
-            {"type": "oauth2", "scopes": ["quollnet:access"]}
+            {"type": "oauth2", "scopes": ["mcp:connect"]}
         ],
         "openai/toolInvocation/invoking": "Retrieving CashflowPot projects",
         "openai/toolInvocation/invoked": "CashflowPot projects retrieved",
@@ -652,7 +650,7 @@ mcp.tool(
     ),
     meta={
         "securitySchemes": [
-            {"type": "oauth2", "scopes": ["quollnet:access"]}
+            {"type": "oauth2", "scopes": ["mcp:connect"]}
         ],
         "openai/toolInvocation/invoking": "Creating CashflowPot scenario",
         "openai/toolInvocation/invoked": "CashflowPot scenario created",
