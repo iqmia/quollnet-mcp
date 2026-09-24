@@ -19,6 +19,27 @@ class QToolHowToStep(BaseModel):
     text: Annotated[str, Field(min_length=1, max_length=2000)]
 
 
+class QToolCreateMetadata(BaseModel):
+    """Approved metadata accepted when creating a new qTool."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    description: Annotated[str | None, Field(max_length=2000)] = None
+    embed_description: Annotated[str | None, Field(max_length=1000)] = None
+    seo_title: Annotated[str | None, Field(max_length=255)] = None
+    seo_description: Annotated[str | None, Field(max_length=2000)] = None
+    keywords: Annotated[str | None, Field(max_length=2000)] = None
+    application_category: Annotated[str | None, Field(max_length=80)] = None
+    operating_system: Annotated[str | None, Field(max_length=40)] = None
+    login_required: bool | None = None
+    article_embed_allowed: bool | None = None
+    changefreq: Literal["daily", "weekly", "monthly", "yearly", "never"] | None = None
+    sitemap_priority: Annotated[str | None, Field(max_length=10)] = None
+    howto_name: Annotated[str | None, Field(max_length=255)] = None
+    howto_description: Annotated[str | None, Field(max_length=2000)] = None
+    howto_steps: list[QToolHowToStep] | None = None
+
+
 class QToolMetadataUpdate(BaseModel):
     """Approved mutable metadata for an existing qTool."""
 
@@ -67,6 +88,43 @@ async def list_qtools(
             status=status,
             page=page,
             per_page=per_page,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def create_qtool(
+    slug: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=80,
+            pattern=_QTOOL_SLUG,
+            description="Unique lowercase kebab-case qTool URL slug.",
+        ),
+    ],
+    tool_name: Annotated[str, Field(min_length=1, max_length=160)],
+    metadata: QToolCreateMetadata | None = None,
+) -> dict[str, Any]:
+    """Create a new qTool with mutable working version v1.
+
+    Retrieve the qTool development guide first. This creates the tool metadata
+    and working version only; package files are added with update_qtool_file,
+    then validated with save_qtool. It never publishes the tool.
+    """
+    access_token = await qapp_user_token()
+
+    payload: dict[str, Any] = {
+        "slug": slug,
+        "tool_name": tool_name,
+    }
+    if metadata is not None:
+        payload["metadata"] = metadata.model_dump(exclude_none=True)
+
+    try:
+        return await qapp_client.create_qtool(
+            access_token=access_token,
+            payload=payload,
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
