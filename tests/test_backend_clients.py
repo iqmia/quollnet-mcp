@@ -229,6 +229,45 @@ class BackendClientTests(unittest.IsolatedAsyncioTestCase):
             {"target_app_id": "cashflowpot-test-app"},
         )
 
+    async def test_qauth_exchange_includes_unit_id_when_requested(self) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["json"] = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(
+                200,
+                json={
+                    "access_token": "cashflowpot-unit-token",
+                    "token_type": "Bearer",
+                    "client_app_id": "cashflowpot-test-app",
+                    "unit_id": "unit-1",
+                },
+            )
+
+        client = QAuthClient()
+        client._client = httpx.AsyncClient(
+            base_url="https://quollnet.com/api",
+            transport=httpx.MockTransport(handler),
+        )
+        try:
+            token = await client.exchange_app_token(
+                mcp_access_token="mcp-token",
+                target_app_id="cashflowpot-test-app",
+                unit_id="unit-1",
+            )
+        finally:
+            await client._client.aclose()
+            client._client = None
+
+        self.assertEqual(token, "cashflowpot-unit-token")
+        self.assertEqual(
+            seen["json"],
+            {
+                "target_app_id": "cashflowpot-test-app",
+                "unit_id": "unit-1",
+            },
+        )
+
     async def test_qflow_import_uses_cashflowpot_token_and_unit_route(self) -> None:
         seen = {}
 
