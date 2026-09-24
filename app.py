@@ -79,7 +79,7 @@ mcp.tool(
     title="Get connected Quollnet user",
     description=(
         "Return the QAuth identity currently connected to this Quollnet MCP "
-        "account, including name, email, user ID, and qApp roles."
+        "account, including name, email, user ID, and QAuth source-app roles."
     ),
     annotations=ToolAnnotations(
         read_only_hint=True,
