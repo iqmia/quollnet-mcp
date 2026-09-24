@@ -28,11 +28,13 @@ class QAuthTokenVerifier(TokenVerifier):
                 audience=self.resource_uri,
                 options={"require": ["exp", "iat", "iss", "aud", "sub", "nbf"]},
             )
+            scope = claims.get("scope")
             if (
                 claims.get("token_use") != "mcp_access"
                 or claims.get("client_app_id") != self.app_id
                 or claims.get("sub") != claims.get("user_id")
-                or not isinstance(claims.get("scope"), str)
+                or not isinstance(scope, str)
+                or set(scope.split()) != {"mcp:connect"}
             ):
                 return None
 
