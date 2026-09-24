@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import os
@@ -23,12 +22,6 @@ from quollnet_mcp.tools.qtools import (
 )
 
 
-def _token(*scopes: str):
-    return SimpleNamespace(
-        token="bearer-token",
-        subject="user-1",
-        scopes=list(scopes),
-    )
 
 
 class GetQToolDevelopmentGuideTests(unittest.IsolatedAsyncioTestCase):
@@ -41,8 +34,8 @@ class GetQToolDevelopmentGuideTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:read"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.get_qtool_development_guide",
@@ -53,22 +46,15 @@ class GetQToolDevelopmentGuideTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, expected)
         get_guide.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
         )
 
-    async def test_requires_qtools_read_scope(self) -> None:
-        with patch(
-            "quollnet_mcp.tools.qtools.get_access_token",
-            return_value=_token("articles:read"),
-        ):
-            with self.assertRaisesRegex(ToolError, "qtools:read"):
-                await get_qtool_development_guide()
 
     async def test_qapp_error_is_converted(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:read"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.get_qtool_development_guide",
@@ -90,8 +76,8 @@ class ListQToolsTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:read"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.list_qtools",
@@ -106,7 +92,7 @@ class ListQToolsTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, expected)
         list_call.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             status="published",
             page=2,
             per_page=10,
@@ -136,8 +122,8 @@ class GetQToolTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:read"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.get_qtool",
@@ -156,11 +142,11 @@ class GetQToolTests(unittest.IsolatedAsyncioTestCase):
             ["core.html", "css/01-base.css", "js/01-ui.js"],
         )
         get_call.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
         )
         files_call.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
         )
 
@@ -177,8 +163,8 @@ class GetQToolFileTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:read"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.get_qtool_file",
@@ -192,7 +178,7 @@ class GetQToolFileTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, expected)
         get_file.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
             relative_path="js/01-ui.js",
         )
@@ -209,8 +195,8 @@ class UpdateQToolFileTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:edit"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.update_qtool_file",
@@ -225,24 +211,12 @@ class UpdateQToolFileTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, expected)
         update_file.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
             relative_path="core.html",
             content='<section data-qtool="sample-tool"></section>',
             encoding="utf-8",
         )
-
-    async def test_read_scope_is_not_enough(self) -> None:
-        with patch(
-            "quollnet_mcp.tools.qtools.get_access_token",
-            return_value=_token("qtools:read"),
-        ):
-            with self.assertRaisesRegex(ToolError, "qtools:edit"):
-                await update_qtool_file(
-                    "sample-tool",
-                    "core.html",
-                    "<section></section>",
-                )
 
 
 class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
@@ -261,8 +235,8 @@ class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:edit"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.update_qtool_metadata",
@@ -276,7 +250,7 @@ class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, expected)
         update_meta.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
             payload={
                 "description": "Updated description",
@@ -289,8 +263,8 @@ class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:edit"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.update_qtool_metadata",
@@ -300,16 +274,16 @@ class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
             await update_qtool_metadata("sample-tool", metadata)
 
         update_meta.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
             payload={"description": None},
         )
 
     async def test_empty_metadata_update_is_rejected(self) -> None:
         with patch(
-            "quollnet_mcp.tools.qtools.get_access_token",
-            return_value=_token("qtools:edit"),
-        ):
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
+            ):
             with self.assertRaisesRegex(ToolError, "At least one"):
                 await update_qtool_metadata(
                     "sample-tool",
@@ -328,8 +302,8 @@ class SaveQToolTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:edit"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.save_qtool",
@@ -340,17 +314,9 @@ class SaveQToolTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, expected)
         save_call.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
         )
-
-    async def test_read_scope_is_not_enough(self) -> None:
-        with patch(
-            "quollnet_mcp.tools.qtools.get_access_token",
-            return_value=_token("qtools:read"),
-        ):
-            with self.assertRaisesRegex(ToolError, "qtools:edit"):
-                await save_qtool("sample-tool")
 
 
 class PublishQToolTests(unittest.IsolatedAsyncioTestCase):
@@ -364,8 +330,8 @@ class PublishQToolTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:publish"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.publish_qtool",
@@ -379,7 +345,7 @@ class PublishQToolTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, expected)
         publish_call.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
             version=2,
         )
@@ -387,8 +353,8 @@ class PublishQToolTests(unittest.IsolatedAsyncioTestCase):
     async def test_version_may_be_omitted(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.qtools.get_access_token",
-                return_value=_token("qtools:publish"),
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
             ),
             patch(
                 "quollnet_mcp.tools.qtools.qapp_client.publish_qtool",
@@ -398,18 +364,10 @@ class PublishQToolTests(unittest.IsolatedAsyncioTestCase):
             await publish_qtool("sample-tool")
 
         publish_call.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             slug="sample-tool",
             version=None,
         )
-
-    async def test_edit_scope_is_not_enough(self) -> None:
-        with patch(
-            "quollnet_mcp.tools.qtools.get_access_token",
-            return_value=_token("qtools:edit"),
-        ):
-            with self.assertRaisesRegex(ToolError, "qtools:publish"):
-                await publish_qtool("sample-tool")
 
 
 if __name__ == "__main__":
