@@ -32,6 +32,7 @@ from quollnet_mcp.tools.articles import (
 )
 from quollnet_mcp.tools.qapp_auth import get_current_user
 from quollnet_mcp.tools.qtools import (
+    create_qtool,
     get_qtool,
     get_qtool_development_guide,
     get_qtool_file,
@@ -195,6 +196,33 @@ mcp.tool(
         "openai/toolInvocation/invoked": "qTools listed",
     },
 )(list_qtools)
+
+
+mcp.tool(
+    name="create_qtool",
+    title="Create Quollnet qTool",
+    description=(
+        "Create a new Quollnet qTool and mutable working version v1. Read the "
+        "qTool development guide first. This creates metadata and the working "
+        "version only; add package files with update_qtool_file, then use "
+        "save_qtool to validate and freeze the version. It never publishes."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {
+                "type": "oauth2",
+                "scopes": ["mcp:connect"],
+            }
+        ],
+        "openai/toolInvocation/invoking": "Creating qTool working version",
+        "openai/toolInvocation/invoked": "qTool working version created",
+    },
+)(create_qtool)
 
 
 mcp.tool(
