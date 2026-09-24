@@ -26,7 +26,7 @@ class CashflowPotToolTests(unittest.IsolatedAsyncioTestCase):
         return SimpleNamespace(
             token="mcp-bearer-token",
             subject="user-1",
-            scopes=["articles:read"],
+            scopes=["mcp:connect"],
         )
 
     async def test_list_projects_exchanges_token_then_calls_qflow(self) -> None:
@@ -60,6 +60,7 @@ class CashflowPotToolTests(unittest.IsolatedAsyncioTestCase):
         exchange.assert_awaited_once_with(
             mcp_access_token="mcp-bearer-token",
             target_app_id="cashflowpot-test-app",
+            unit_id=None,
         )
         projects.assert_awaited_once_with(
             access_token="cashflowpot-user-token",
@@ -103,8 +104,8 @@ class CashflowPotToolTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch(
                 "quollnet_mcp.tools.cashflowpot.qauth_client.exchange_app_token",
-                new=AsyncMock(return_value="cashflowpot-user-token"),
-            ),
+                new=AsyncMock(return_value="cashflowpot-unit-token"),
+            ) as exchange,
             patch(
                 "quollnet_mcp.tools.cashflowpot.qflow_client.import_cashflow",
                 new=AsyncMock(return_value=expected),
@@ -113,9 +114,14 @@ class CashflowPotToolTests(unittest.IsolatedAsyncioTestCase):
             actual = await create_cashflow(unit_id="unit-1", cashflow=cashflow)
 
         self.assertIs(actual, expected)
+        exchange.assert_awaited_once_with(
+            mcp_access_token="mcp-bearer-token",
+            target_app_id="cashflowpot-test-app",
+            unit_id="unit-1",
+        )
         importer.assert_awaited_once()
         _, kwargs = importer.call_args
-        self.assertEqual(kwargs["access_token"], "cashflowpot-user-token")
+        self.assertEqual(kwargs["access_token"], "cashflowpot-unit-token")
         self.assertEqual(kwargs["unit_id"], "unit-1")
 
         payload = kwargs["payload"]
