@@ -181,7 +181,7 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
 
         mock_call.assert_awaited_once()
         _, kwargs = mock_call.call_args
-        self.assertEqual(kwargs["access_token"], "bearer-token")
+        self.assertEqual(kwargs["access_token"], "qapp-user-token")
 
     async def test_forwards_text_unchanged(self) -> None:
         article_text = "Detailed article text about construction quality."
