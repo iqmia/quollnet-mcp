@@ -30,6 +30,7 @@ from quollnet_mcp.tools.articles import (
     set_article_hero_image,
     upload_article_file,
 )
+from quollnet_mcp.tools.qapp_auth import get_current_user
 from quollnet_mcp.tools.qtools import (
     get_qtool,
     get_qtool_development_guide,
@@ -72,6 +73,28 @@ async def server_status() -> dict[str, str]:
         "version": SERVICE_VERSION,
         "status": "ok",
     }
+
+mcp.tool(
+    name="get_current_user",
+    title="Get connected Quollnet user",
+    description=(
+        "Return the QAuth identity currently connected to this Quollnet MCP "
+        "account, including name, email, user ID, and qApp roles."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [
+            {"type": "oauth2", "scopes": ["quollnet:access"]}
+        ],
+        "openai/toolInvocation/invoking": "Checking connected Quollnet user",
+        "openai/toolInvocation/invoked": "Connected Quollnet user retrieved",
+    },
+)(get_current_user)
+
 
 # Define the search_articles and create_article_draft tools, which are used to 
 # interact with the Quollnet article system.
@@ -140,7 +163,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:read"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Retrieving qTool guide",
@@ -166,7 +189,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:read"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Listing qTools",
@@ -192,7 +215,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:read"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Inspecting qTool",
@@ -217,7 +240,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:read"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Reading qTool file",
@@ -243,7 +266,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:edit"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Updating qTool file",
@@ -268,7 +291,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:edit"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Updating qTool metadata",
@@ -294,7 +317,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:edit"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Saving qTool version",
@@ -320,7 +343,7 @@ mcp.tool(
         "securitySchemes": [
             {
                 "type": "oauth2",
-                "scopes": ["quollnet:access", "qtools:publish"],
+                "scopes": ["quollnet:access"],
             }
         ],
         "openai/toolInvocation/invoking": "Publishing qTool",
