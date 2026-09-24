@@ -20,16 +20,20 @@ class Settings:
     mcp_resource_uri: str
     qauth_app_id: str
     qauth_public_key: str
+    qapp_app_id: str
 
 
 def get_settings() -> Settings:
     qauth_app_id = os.getenv("QAUTH_APP_ID")
     qauth_public_key = os.getenv("QAUTH_PUBLIC_KEY")
+    qapp_app_id = os.getenv("QAPP_APP_ID")
     cashflowpot_app_id = os.getenv("CASHFLOWPOT_APP_ID")
     if not qauth_app_id:
         raise ValueError("QAUTH_APP_ID is required")
     if not qauth_public_key:
         raise ValueError("QAUTH_PUBLIC_KEY is required")
+    if not qapp_app_id:
+        raise ValueError("QAPP_APP_ID is required")
     if not cashflowpot_app_id:
         raise ValueError("CASHFLOWPOT_APP_ID is required")
 
@@ -45,4 +49,5 @@ def get_settings() -> Settings:
         mcp_resource_uri=os.getenv("MCP_RESOURCE_URI", "https://mcp.quollnet.com/mcp"),
         qauth_app_id=qauth_app_id,
         qauth_public_key=qauth_public_key.replace("\\n", "\n"),
+        qapp_app_id=qapp_app_id,
     )
