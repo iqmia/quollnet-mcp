@@ -11,7 +11,9 @@ os.environ.setdefault("CASHFLOWPOT_APP_ID", "cashflowpot-test-app")
 from mcp.server.mcpserver.exceptions import ToolError
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.tools.qtools import (
+    QToolCreateMetadata,
     QToolMetadataUpdate,
+    create_qtool,
     get_qtool,
     get_qtool_development_guide,
     get_qtool_file,
@@ -98,6 +100,98 @@ class ListQToolsTests(unittest.IsolatedAsyncioTestCase):
             page=2,
             per_page=10,
         )
+
+
+class CreateQToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exchanges_qapp_token_and_builds_create_payload(self) -> None:
+        expected = {
+            "data": {
+                "slug": "concrete-checker",
+                "working_version": 1,
+            }
+        }
+        metadata = QToolCreateMetadata(
+            description="Concrete decision aid.",
+            keywords="concrete, qa qc",
+            login_required=False,
+            article_embed_allowed=True,
+        )
+
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.create_qtool",
+                new=AsyncMock(return_value=expected),
+            ) as create_call,
+        ):
+            actual = await create_qtool(
+                slug="concrete-checker",
+                tool_name="Concrete Checker",
+                metadata=metadata,
+            )
+
+        self.assertIs(actual, expected)
+        create_call.assert_awaited_once_with(
+            access_token="qapp-user-token",
+            payload={
+                "slug": "concrete-checker",
+                "tool_name": "Concrete Checker",
+                "metadata": {
+                    "description": "Concrete decision aid.",
+                    "keywords": "concrete, qa qc",
+                    "login_required": False,
+                    "article_embed_allowed": True,
+                },
+            },
+        )
+
+    async def test_metadata_is_optional(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.create_qtool",
+                new=AsyncMock(return_value={"data": {}}),
+            ) as create_call,
+        ):
+            await create_qtool(
+                slug="concrete-checker",
+                tool_name="Concrete Checker",
+            )
+
+        create_call.assert_awaited_once_with(
+            access_token="qapp-user-token",
+            payload={
+                "slug": "concrete-checker",
+                "tool_name": "Concrete Checker",
+            },
+        )
+
+    async def test_qapp_error_is_converted(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_user_token",
+                new=AsyncMock(return_value="qapp-user-token"),
+            ),
+            patch(
+                "quollnet_mcp.tools.qtools.qapp_client.create_qtool",
+                new=AsyncMock(
+                    side_effect=QAppClientError(
+                        "qApp returned HTTP 400: Tool slug already exists"
+                    )
+                ),
+            ),
+        ):
+            with self.assertRaisesRegex(ToolError, "slug already exists"):
+                await create_qtool(
+                    slug="concrete-checker",
+                    tool_name="Concrete Checker",
+                )
 
 
 class GetQToolTests(unittest.IsolatedAsyncioTestCase):
