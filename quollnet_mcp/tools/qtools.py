@@ -1,11 +1,11 @@
 from typing import Annotated, Any, Literal
 
-from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
 
 from quollnet_mcp.dependencies import qapp_client
 from quollnet_mcp.services.qapp_client import QAppClientError
+from quollnet_mcp.tools.qapp_auth import qapp_user_token
 
 
 _QTOOL_SLUG = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
@@ -41,28 +41,13 @@ class QToolMetadataUpdate(BaseModel):
     howto_steps: list[QToolHowToStep] | None = None
 
 
-def _require_scope(scope: str):
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if scope not in scopes:
-        raise ToolError(
-            f"The connected account does not have {scope} permission"
-        )
-
-    return access_token
-
-
 async def get_qtool_development_guide() -> dict[str, Any]:
     """Return the canonical Quollnet Tools V2 development guide."""
-    access_token = _require_scope("qtools:read")
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.get_qtool_development_guide(
-            access_token=access_token.token,
+            access_token=access_token,
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
@@ -74,11 +59,11 @@ async def list_qtools(
     per_page: Annotated[int, Field(ge=1, le=100)] = 25,
 ) -> dict[str, Any]:
     """List qTools visible to the connected user."""
-    access_token = _require_scope("qtools:read")
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.list_qtools(
-            access_token=access_token.token,
+            access_token=access_token,
             status=status,
             page=page,
             per_page=per_page,
@@ -99,15 +84,15 @@ async def get_qtool(
     ],
 ) -> dict[str, Any]:
     """Inspect one qTool, its versions, and the current editable package file list."""
-    access_token = _require_scope("qtools:read")
+    access_token = await qapp_user_token()
 
     try:
         tool_response = await qapp_client.get_qtool(
-            access_token=access_token.token,
+            access_token=access_token,
             slug=slug,
         )
         files_response = await qapp_client.list_qtool_files(
-            access_token=access_token.token,
+            access_token=access_token,
             slug=slug,
         )
     except QAppClientError as error:
@@ -147,11 +132,11 @@ async def get_qtool_file(
     ],
 ) -> dict[str, Any]:
     """Read one file from the qTool package selected for the next edit."""
-    access_token = _require_scope("qtools:read")
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.get_qtool_file(
-            access_token=access_token.token,
+            access_token=access_token,
             slug=slug,
             relative_path=relative_path,
         )
@@ -188,11 +173,11 @@ async def update_qtool_file(
     encoding: Literal["utf-8", "base64"] = "utf-8",
 ) -> dict[str, Any]:
     """Replace one qTool package file in the mutable working version."""
-    access_token = _require_scope("qtools:edit")
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.update_qtool_file(
-            access_token=access_token.token,
+            access_token=access_token,
             slug=slug,
             relative_path=relative_path,
             content=content,
@@ -210,7 +195,7 @@ async def update_qtool_metadata(
     metadata: QToolMetadataUpdate,
 ) -> dict[str, Any]:
     """Update selected metadata for an existing qTool without publishing it."""
-    access_token = _require_scope("qtools:edit")
+    access_token = await qapp_user_token()
     payload = metadata.model_dump(exclude_unset=True)
 
     if not payload:
@@ -218,7 +203,7 @@ async def update_qtool_metadata(
 
     try:
         return await qapp_client.update_qtool_metadata(
-            access_token=access_token.token,
+            access_token=access_token,
             slug=slug,
             payload=payload,
         )
@@ -233,11 +218,11 @@ async def save_qtool(
     ],
 ) -> dict[str, Any]:
     """Validate and freeze the current qTool working version without publishing it."""
-    access_token = _require_scope("qtools:edit")
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.save_qtool(
-            access_token=access_token.token,
+            access_token=access_token,
             slug=slug,
         )
     except QAppClientError as error:
@@ -261,11 +246,11 @@ async def publish_qtool(
     ] = None,
 ) -> dict[str, Any]:
     """Publish a saved qTool version. qApp requires an authenticated app admin."""
-    access_token = _require_scope("qtools:publish")
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.publish_qtool(
-            access_token=access_token.token,
+            access_token=access_token,
             slug=slug,
             version=version,
         )
