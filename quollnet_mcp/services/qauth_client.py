@@ -40,17 +40,21 @@ class QAuthClient:
         *,
         mcp_access_token: str,
         target_app_id: str,
+        unit_id: str | None = None,
     ) -> str:
-        """Exchange a Quollnet MCP token for a normal target-app user token."""
+        """Exchange a Quollnet MCP token for a normal target app/unit token."""
         if self._client is None:
             raise QAuthClientError(
                 "QAuthClient must be used as an async context manager"
             )
 
         try:
+            payload = {"target_app_id": target_app_id}
+            if unit_id:
+                payload["unit_id"] = unit_id
             response = await self._client.post(
-                "/oauth/exchange-app-token",
-                json={"target_app_id": target_app_id},
+                "/oauth/exchange-token",
+                json=payload,
                 headers={"Authorization": f"Bearer {mcp_access_token}"},
             )
             response.raise_for_status()
