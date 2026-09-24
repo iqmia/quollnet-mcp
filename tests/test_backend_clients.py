@@ -57,6 +57,51 @@ class BackendClientTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(seen["authorization"], "Bearer mcp-token")
 
+    async def test_qapp_create_qtool_uses_v2_collection_route(self) -> None:
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["method"] = request.method
+            seen["path"] = request.url.path
+            seen["authorization"] = request.headers.get("Authorization")
+            seen["json"] = json.loads(request.content.decode("utf-8"))
+            return httpx.Response(
+                201,
+                json={
+                    "data": {
+                        "slug": "concrete-checker",
+                        "working_version": 1,
+                    }
+                },
+            )
+
+        client = QAppClient()
+        client._client = httpx.AsyncClient(
+            base_url="https://quollnet.com",
+            transport=httpx.MockTransport(handler),
+        )
+        payload = {
+            "slug": "concrete-checker",
+            "tool_name": "Concrete Checker",
+            "metadata": {
+                "description": "Concrete decision aid.",
+            },
+        }
+        try:
+            result = await client.create_qtool(
+                access_token="qapp-user-token",
+                payload=payload,
+            )
+        finally:
+            await client._client.aclose()
+            client._client = None
+
+        self.assertEqual(result["data"]["working_version"], 1)
+        self.assertEqual(seen["method"], "POST")
+        self.assertEqual(seen["path"], "/tools/api/v2/")
+        self.assertEqual(seen["authorization"], "Bearer qapp-user-token")
+        self.assertEqual(seen["json"], payload)
+
     async def test_qapp_update_qtool_file_preserves_nested_path(self) -> None:
         seen = {}
 
