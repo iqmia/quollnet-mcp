@@ -27,12 +27,6 @@ from quollnet_mcp.tools.articles import (
 
 class CreateArticleDraftTests(unittest.IsolatedAsyncioTestCase):
     async def test_forwards_token_and_payload(self) -> None:
-        token = SimpleNamespace(
-            token="bearer-token",
-            subject="user-1",
-            scopes=["articles:read", "articles:create"],
-        )
-
         answer_summary = "A concise practical answer."
 
         expected_authoring_data = build_authoring_data(
@@ -171,13 +165,6 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
             "methods": [{"slug": "method-c", "title": "Method C"}],
         },
     }
-
-    def _token(self, scopes=("articles:read",), subject="user-1"):
-        return SimpleNamespace(
-            token="bearer-token",
-            subject=subject,
-            scopes=list(scopes),
-        )
 
     async def test_forwards_access_token(self) -> None:
         with (
@@ -335,13 +322,6 @@ class AppRegistrationTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class GetArticleTests(unittest.IsolatedAsyncioTestCase):
-    def _token(self, scopes=("articles:read",), subject="user-1"):
-        return SimpleNamespace(
-            token="bearer-token",
-            subject=subject,
-            scopes=list(scopes),
-        )
-
     _ARTICLE_RESPONSE = {
         "message": "ok",
         "data": {
@@ -393,13 +373,6 @@ class GetArticleTests(unittest.IsolatedAsyncioTestCase):
 # ---------------------------------------------------------------------------
 
 class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
-    def _token(self, scopes=("articles:read", "articles:edit"), subject="user-1"):
-        return SimpleNamespace(
-            token="bearer-token",
-            subject=subject,
-            scopes=list(scopes),
-        )
-
     _EDIT_RESPONSE = {"message": "Article draft updated", "data": {"id": "art-42"}}
 
     _CURRENT_ARTICLE = {
@@ -541,13 +514,6 @@ class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
 # ---------------------------------------------------------------------------
 
 class ReplaceArticleBodyTextTests(unittest.IsolatedAsyncioTestCase):
-    def _token(self, scopes=("articles:read", "articles:edit"), subject="user-1"):
-        return SimpleNamespace(
-            token="bearer-token",
-            subject=subject,
-            scopes=list(scopes),
-        )
-
     _RESPONSE = {"message": "Article text updated", "data": {"id": "art-42"}}
 
     async def test_forwards_article_id_texts_and_token(self) -> None:
@@ -601,13 +567,6 @@ import base64
 
 
 class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
-    def _token(self, scopes=None):
-        return SimpleNamespace(
-            token="upload-token",
-            subject="user-1",
-            scopes=scopes or ["articles:files:create"],
-        )
-
     async def test_valid_base64_decoded_and_forwarded(self) -> None:
         raw = b"fake image bytes"
         encoded = base64.b64encode(raw).decode()
@@ -670,13 +629,6 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ListArticleFilesTests(unittest.IsolatedAsyncioTestCase):
-    def _token(self, scopes=None):
-        return SimpleNamespace(
-            token="list-token",
-            subject="user-1",
-            scopes=scopes or ["articles:files:list"],
-        )
-
     async def test_forwards_article_id_and_token(self) -> None:
         expected = {
             "message": "Article files retrieved",
@@ -697,13 +649,6 @@ class ListArticleFilesTests(unittest.IsolatedAsyncioTestCase):
 
 
 class RenameArticleFileTests(unittest.IsolatedAsyncioTestCase):
-    def _token(self, scopes=None):
-        return SimpleNamespace(
-            token="rename-token",
-            subject="user-1",
-            scopes=scopes or ["articles:files:update"],
-        )
-
     async def test_forwards_all_arguments(self) -> None:
         expected = {"message": "File renamed", "data": {"name": "better-name.pdf"}}
 
