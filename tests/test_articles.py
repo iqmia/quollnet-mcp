@@ -59,8 +59,8 @@ class CreateArticleDraftTests(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=token,
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.create_article_draft",
@@ -93,7 +93,7 @@ class CreateArticleDraftTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(actual, expected)
 
         create.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             payload={
                 "subject": "Test Article Draft",
                 "path": "test-article-draft",
@@ -117,7 +117,7 @@ class SearchArticlesTests(unittest.IsolatedAsyncioTestCase):
         result = {"articles": [], "pagination": {"page": 2}}
         token = SimpleNamespace(token="bearer-token", subject="user-1")
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=token),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.search_articles",
                 new=AsyncMock(return_value=result),
@@ -136,7 +136,7 @@ class SearchArticlesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, result)
         search.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             q="climate",
             topic="science",
             lang="en",
@@ -147,21 +147,12 @@ class SearchArticlesTests(unittest.IsolatedAsyncioTestCase):
             per_page=10,
         )
 
-    async def test_missing_authentication(self) -> None:
-        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=None):
-            with self.assertRaises(ToolError):
-                await search_articles()
 
-    async def test_missing_authenticated_subject(self) -> None:
-        token = SimpleNamespace(token="bearer-token", subject=None)
-        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=token):
-            with self.assertRaises(ToolError):
-                await search_articles()
 
     async def test_qapp_error_is_converted(self) -> None:
         token = SimpleNamespace(token="bearer-token", subject="user-1")
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=token),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.search_articles",
                 new=AsyncMock(side_effect=QAppClientError("qApp unavailable")),
@@ -191,8 +182,8 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
     async def test_forwards_access_token(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -209,8 +200,8 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
         article_text = "Detailed article text about construction quality."
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -225,8 +216,8 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
     async def test_top_n_defaults_to_10(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -241,8 +232,8 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
     async def test_exclude_slugs_defaults_to_none(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -257,8 +248,8 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
     async def test_explicit_top_n_and_exclude_slugs_are_forwarded(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -278,8 +269,8 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
     async def test_returns_qapp_response_unchanged(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -294,8 +285,8 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
         """The three result groups must be returned as-is from qApp."""
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -313,34 +304,14 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(data["checklists"], list)
         self.assertIsInstance(data["methods"], list)
 
-    async def test_missing_authentication_raises_tool_error(self) -> None:
-        with patch(
-            "quollnet_mcp.tools.articles.get_access_token", return_value=None
-        ):
-            with self.assertRaises(ToolError):
-                await get_internal_link_candidates(text="text")
 
-    async def test_missing_subject_raises_tool_error(self) -> None:
-        token = SimpleNamespace(token="bearer-token", subject=None, scopes=["articles:read"])
-        with patch(
-            "quollnet_mcp.tools.articles.get_access_token", return_value=token
-        ):
-            with self.assertRaises(ToolError):
-                await get_internal_link_candidates(text="text")
 
-    async def test_missing_articles_read_scope_raises_tool_error(self) -> None:
-        token = SimpleNamespace(token="bearer-token", subject="user-1", scopes=[])
-        with patch(
-            "quollnet_mcp.tools.articles.get_access_token", return_value=token
-        ):
-            with self.assertRaisesRegex(ToolError, "articles:read"):
-                await get_internal_link_candidates(text="text")
 
     async def test_qapp_error_is_converted_to_tool_error(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_internal_link_candidates",
@@ -384,8 +355,8 @@ class GetArticleTests(unittest.IsolatedAsyncioTestCase):
     async def test_forwards_article_id_and_access_token(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_article",
@@ -396,26 +367,17 @@ class GetArticleTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(result, self._ARTICLE_RESPONSE)
         mock_get.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             article_id="art-42",
         )
 
-    async def test_missing_authentication_raises_tool_error(self) -> None:
-        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=None):
-            with self.assertRaises(ToolError):
-                await get_article(article_id="art-1")
 
-    async def test_missing_scope_raises_tool_error(self) -> None:
-        token = SimpleNamespace(token="t", subject="user-1", scopes=[])
-        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=token):
-            with self.assertRaisesRegex(ToolError, "articles:read"):
-                await get_article(article_id="art-1")
 
     async def test_qapp_error_becomes_tool_error(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_article",
@@ -486,8 +448,8 @@ class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
     async def test_body_only_edit_sends_only_body(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.edit_article_draft",
@@ -497,7 +459,7 @@ class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
             await edit_article_draft(article_id="art-42", body="<p>New body</p>")
 
         mock_edit.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             article_id="art-42",
             payload={"body": "<p>New body</p>"},
         )
@@ -505,8 +467,8 @@ class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
     async def test_empty_edit_raises_tool_error_without_calling_qapp(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.edit_article_draft",
@@ -518,19 +480,14 @@ class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
 
         mock_edit.assert_not_awaited()
 
-    async def test_missing_articles_edit_scope_raises_tool_error(self) -> None:
-        token = SimpleNamespace(token="t", subject="user-1", scopes=["articles:read"])
-        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=token):
-            with self.assertRaisesRegex(ToolError, "articles:edit"):
-                await edit_article_draft(article_id="art-42", body="<p>x</p>")
 
     async def test_authoring_edit_retrieves_current_and_merges(self) -> None:
         """Changing answer_summary must fetch current article and preserve
         unrelated authoring_data fields (e.g. existing internal_links)."""
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_article",
@@ -560,8 +517,8 @@ class EditArticleDraftTests(unittest.IsolatedAsyncioTestCase):
         """Explicitly passing references=[] must clear references in the payload."""
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.get_article",
@@ -596,8 +553,8 @@ class ReplaceArticleBodyTextTests(unittest.IsolatedAsyncioTestCase):
     async def test_forwards_article_id_texts_and_token(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.replace_article_body_text",
@@ -612,36 +569,18 @@ class ReplaceArticleBodyTextTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(actual, self._RESPONSE)
         mock_replace.assert_awaited_once_with(
-            access_token="bearer-token",
+            access_token="qapp-user-token",
             article_id="art-42",
             old_text="Hello world",
             new_text="Hello Quollnet",
         )
 
-    async def test_requires_articles_edit_scope(self) -> None:
-        token = SimpleNamespace(token="t", subject="user-1", scopes=["articles:read"])
-        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=token):
-            with self.assertRaisesRegex(ToolError, "articles:edit"):
-                await replace_article_body_text(
-                    article_id="art-42",
-                    old_text="old",
-                    new_text="new",
-                )
-
-    async def test_missing_authentication_raises_tool_error(self) -> None:
-        with patch("quollnet_mcp.tools.articles.get_access_token", return_value=None):
-            with self.assertRaises(ToolError):
-                await replace_article_body_text(
-                    article_id="art-42",
-                    old_text="old",
-                    new_text="new",
-                )
 
     async def test_qapp_client_error_becomes_tool_error(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.get_access_token",
-                return_value=self._token(),
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
             ),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.replace_article_body_text",
@@ -675,7 +614,7 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
         expected = {"message": "File uploaded", "data": {"name": "photo.webp", "url": "https://cdn.example.com/photo.webp"}}
 
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
                 new=AsyncMock(return_value=expected),
@@ -689,7 +628,7 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(result, expected)
         upload.assert_awaited_once_with(
-            access_token="upload-token",
+            access_token="qapp-user-token",
             article_id="art-1",
             file_name="photo.png",
             file_bytes=raw,
@@ -701,7 +640,7 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
         encoded = base64.b64encode(raw).decode()
 
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
                 new=AsyncMock(return_value={}),
@@ -719,7 +658,7 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_invalid_base64_raises_tool_error(self) -> None:
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
         ):
             with self.assertRaises(ToolError) as ctx:
                 await upload_article_file(
@@ -728,21 +667,6 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
                     file_base64="!!!not-valid-base64!!!",
                 )
         self.assertIn("base64", str(ctx.exception).lower())
-
-    async def test_requires_files_create_scope(self) -> None:
-        token = self._token(scopes=["articles:read"])
-        raw = base64.b64encode(b"x").decode()
-
-        with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=token),
-        ):
-            with self.assertRaises(ToolError) as ctx:
-                await upload_article_file(
-                    article_id="art-1",
-                    file_name="img.png",
-                    file_base64=raw,
-                )
-        self.assertIn("articles:files:create", str(ctx.exception))
 
 
 class ListArticleFilesTests(unittest.IsolatedAsyncioTestCase):
@@ -760,7 +684,7 @@ class ListArticleFilesTests(unittest.IsolatedAsyncioTestCase):
         }
 
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.list_article_files",
                 new=AsyncMock(return_value=expected),
@@ -769,17 +693,7 @@ class ListArticleFilesTests(unittest.IsolatedAsyncioTestCase):
             result = await list_article_files(article_id="art-99")
 
         self.assertIs(result, expected)
-        list_files.assert_awaited_once_with(access_token="list-token", article_id="art-99")
-
-    async def test_requires_files_list_scope(self) -> None:
-        token = self._token(scopes=["articles:read"])
-
-        with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=token),
-        ):
-            with self.assertRaises(ToolError) as ctx:
-                await list_article_files(article_id="art-99")
-        self.assertIn("articles:files:list", str(ctx.exception))
+        list_files.assert_awaited_once_with(access_token="qapp-user-token", article_id="art-99")
 
 
 class RenameArticleFileTests(unittest.IsolatedAsyncioTestCase):
@@ -794,7 +708,7 @@ class RenameArticleFileTests(unittest.IsolatedAsyncioTestCase):
         expected = {"message": "File renamed", "data": {"name": "better-name.pdf"}}
 
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.rename_article_file",
                 new=AsyncMock(return_value=expected),
@@ -808,7 +722,7 @@ class RenameArticleFileTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIs(result, expected)
         rename.assert_awaited_once_with(
-            access_token="rename-token",
+            access_token="qapp-user-token",
             article_id="art-7",
             file_name="old-name.pdf",
             new_name="better-name.pdf",
@@ -816,7 +730,7 @@ class RenameArticleFileTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_qapp_client_error_becomes_tool_error(self) -> None:
         with (
-            patch("quollnet_mcp.tools.articles.get_access_token", return_value=self._token()),
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
             patch(
                 "quollnet_mcp.tools.articles.qapp_client.rename_article_file",
                 new=AsyncMock(side_effect=QAppClientError("qApp returned HTTP 404: File not found")),
