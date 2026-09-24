@@ -222,7 +222,7 @@ class BackendClientTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(token, "cashflowpot-user-token")
         self.assertEqual(seen["method"], "POST")
-        self.assertEqual(seen["path"], "/api/oauth/exchange-app-token")
+        self.assertEqual(seen["path"], "/api/oauth/exchange-token")
         self.assertEqual(seen["authorization"], "Bearer mcp-token")
         self.assertEqual(
             seen["json"],
