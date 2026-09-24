@@ -262,6 +262,19 @@ class QAppClient:
             access_token=access_token,
         )
 
+    async def create_qtool(
+        self,
+        *,
+        access_token: str,
+        payload: Mapping[str, Any],
+    ) -> Any:
+        """Create a new qTool with mutable working version v1."""
+        return await self.post_json(
+            "/tools/api/v2/",
+            payload=payload,
+            access_token=access_token,
+        )
+
     async def list_qtools(
         self,
         *,
