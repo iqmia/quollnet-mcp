@@ -102,7 +102,7 @@ class CashflowInput(BaseModel):
         return self
 
 
-async def _cashflowpot_user_token() -> str:
+async def _cashflowpot_user_token(unit_id: str | None = None) -> str:
     access_token = get_access_token()
     if access_token is None or not access_token.subject:
         raise ToolError("Authentication is required")
@@ -111,6 +111,7 @@ async def _cashflowpot_user_token() -> str:
         return await qauth_client.exchange_app_token(
             mcp_access_token=access_token.token,
             target_app_id=qauth_client.settings.cashflowpot_app_id,
+            unit_id=unit_id,
         )
     except QAuthClientError as error:
         raise ToolError(str(error)) from error
@@ -156,7 +157,7 @@ async def create_cashflow(
     q_flow validates the input, calculates the scenario, and returns the
     authoritative result.
     """
-    app_token = await _cashflowpot_user_token()
+    unit_token = await _cashflowpot_user_token(unit_id=unit_id)
     payload = {
         "format": "cashflowpot.cashflow",
         "version": 1,
@@ -164,7 +165,7 @@ async def create_cashflow(
     }
     try:
         return await qflow_client.import_cashflow(
-            access_token=app_token,
+            access_token=unit_token,
             unit_id=unit_id,
             payload=payload,
         )
