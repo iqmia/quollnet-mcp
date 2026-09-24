@@ -185,7 +185,7 @@ class GetQToolFileTests(unittest.IsolatedAsyncioTestCase):
 
 
 class UpdateQToolFileTests(unittest.IsolatedAsyncioTestCase):
-    async def test_requires_edit_scope_and_forwards_content(self) -> None:
+    async def test_exchanges_qapp_token_and_forwards_content(self) -> None:
         expected = {
             "data": {
                 "path": "core.html",
@@ -292,7 +292,7 @@ class UpdateQToolMetadataTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SaveQToolTests(unittest.IsolatedAsyncioTestCase):
-    async def test_requires_edit_scope_and_forwards_slug(self) -> None:
+    async def test_exchanges_qapp_token_and_forwards_slug(self) -> None:
         expected = {
             "data": {
                 "slug": "sample-tool",
@@ -320,7 +320,7 @@ class SaveQToolTests(unittest.IsolatedAsyncioTestCase):
 
 
 class PublishQToolTests(unittest.IsolatedAsyncioTestCase):
-    async def test_requires_publish_scope_and_forwards_version(self) -> None:
+    async def test_exchanges_qapp_token_and_forwards_version(self) -> None:
         expected = {
             "data": {
                 "slug": "sample-tool",
