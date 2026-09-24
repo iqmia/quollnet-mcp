@@ -1,13 +1,13 @@
 import base64
 from typing import Annotated, Any, Literal
 
-from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
 
 from quollnet_mcp.dependencies import qapp_client
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.services.article_authoring import build_authoring_data, merge_authoring_data_for_edit
+from quollnet_mcp.tools.qapp_auth import qapp_user_token
 
 
 async def search_articles(
@@ -21,13 +21,10 @@ async def search_articles(
     per_page: Annotated[int, Field(ge=1, le=100)] = 25,
 ) -> dict[str, Any]:
     """Search published articles and the authenticated user's drafts."""
-    access_token = get_access_token()
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
+    access_token = await qapp_user_token()
     try:
         return await qapp_client.search_articles(
-            access_token=access_token.token,
+            access_token=access_token,
             q=q,
             topic=topic,
             lang=lang,
@@ -295,16 +292,7 @@ async def create_article_draft(
     ready for publication, or set protected publication fields. qApp
     performs the authoritative validation and ownership assignment.
     """
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:create" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:create permission"
-        )
+    access_token = await qapp_user_token()
     authoring_data = build_authoring_data(
         slug=path,
         answer_summary=answer_summary,
@@ -339,7 +327,7 @@ async def create_article_draft(
 
     try:
         return await qapp_client.create_article_draft(
-            access_token=access_token.token,
+            access_token=access_token,
             payload=payload,
         )
     except QAppClientError as error:
@@ -365,20 +353,11 @@ async def get_internal_link_candidates(
     and related Method Statement/ITP candidates. Review the candidates and use
     only links that genuinely help the reader; do not insert all returned links
     automatically."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:read" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:read permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.get_internal_link_candidates(
-            access_token=access_token.token,
+            access_token=access_token,
             text=text,
             top_n=top_n,
             exclude_slugs=exclude_slugs,
@@ -389,20 +368,11 @@ async def get_internal_link_candidates(
 
 async def get_article_authoring_policy() -> dict[str, Any]:
     """Retrieve the current authoritative Quollnet article-authoring policy."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:read" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:read permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.get_article_authoring_policy(
-            access_token=access_token.token,
+            access_token=access_token,
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
@@ -423,20 +393,11 @@ async def get_article(
     """Retrieve one Quollnet article by ID. Use this after search_articles when the
     full article content is needed for review or editing. Published articles may
     be readable, while private drafts are subject to qApp ownership rules."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:read" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:read permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.get_article(
-            access_token=access_token.token,
+            access_token=access_token,
             article_id=article_id,
         )
     except QAppClientError as error:
@@ -499,16 +460,7 @@ async def edit_article_draft(
     Retrieve the draft first when reviewing or substantially revising existing
     content. qApp performs authoritative validation and will reject edits to
     published articles."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:edit" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:edit permission"
-        )
+    access_token = await qapp_user_token()
 
     # Build the PATCH payload from only the explicitly supplied direct fields.
     payload: dict[str, Any] = {}
@@ -574,7 +526,7 @@ async def edit_article_draft(
         # Retrieve the current article to obtain existing authoring_data.
         try:
             current = await qapp_client.get_article(
-                access_token=access_token.token,
+                access_token=access_token,
                 article_id=article_id,
             )
         except QAppClientError as error:
@@ -595,7 +547,7 @@ async def edit_article_draft(
 
     try:
         return await qapp_client.edit_article_draft(
-            access_token=access_token.token,
+            access_token=access_token,
             article_id=article_id,
             payload=payload,
         )
@@ -637,20 +589,11 @@ async def replace_article_body_text(
     URL substitutions, or replacing download placeholders. The old text must
     occur exactly once. Use edit_article_draft for substantial edits or changes
     that must also update authoring metadata."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:edit" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:edit permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.replace_article_body_text(
-            access_token=access_token.token,
+            access_token=access_token,
             article_id=article_id,
             old_text=old_text,
             new_text=new_text,
@@ -704,16 +647,7 @@ async def upload_article_file(
     format must be preserved. The returned filename and URL are authoritative
     because image conversion may change the filename extension. Use
     list_article_files afterwards when file discovery is needed."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:files:create" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:files:create permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         file_bytes = base64.b64decode(file_base64, validate=True)
@@ -725,7 +659,7 @@ async def upload_article_file(
 
     try:
         return await qapp_client.upload_article_file(
-            access_token=access_token.token,
+            access_token=access_token,
             article_id=article_id,
             file_name=file_name,
             file_bytes=file_bytes,
@@ -751,20 +685,11 @@ async def list_article_files(
     such as 'insert file X after section B', first use this tool to resolve the
     actual stored filename and URL, then use replace_article_body_text to insert
     the appropriate HTML at a unique article-body anchor."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:files:list" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:files:list permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.list_article_files(
-            access_token=access_token.token,
+            access_token=access_token,
             article_id=article_id,
         )
     except QAppClientError as error:
@@ -805,20 +730,11 @@ async def rename_article_file(
     the article body, including download links and embedded images, and updates
     the hero URL when applicable. Do not manually patch those file URLs after a
     successful rename unless the user also requested surrounding content changes."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:files:update" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:files:update permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.rename_article_file(
-            access_token=access_token.token,
+            access_token=access_token,
             article_id=article_id,
             file_name=file_name,
             new_name=new_name,
@@ -853,20 +769,11 @@ async def set_article_hero_image(
     filename is not already known. This only assigns the hero image; it does not
     insert the image into the article body. Do not use replace_article_body_text
     for hero image assignment."""
-    access_token = get_access_token()
-
-    if access_token is None or not access_token.subject:
-        raise ToolError("Authentication is required")
-
-    scopes = set(access_token.scopes or [])
-    if "articles:files:update" not in scopes:
-        raise ToolError(
-            "The connected account does not have articles:files:update permission"
-        )
+    access_token = await qapp_user_token()
 
     try:
         return await qapp_client.set_article_hero_image(
-            access_token=access_token.token,
+            access_token=access_token,
             article_id=article_id,
             file_name=file_name,
         )
