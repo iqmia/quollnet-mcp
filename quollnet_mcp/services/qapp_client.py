@@ -221,6 +221,57 @@ class QAppClient:
             access_token=access_token,
         )
 
+    async def get_valrig_article_candidate(
+        self,
+        *,
+        access_token: str,
+        requested_form: str | None = None,
+        exclude_publication_ids: list[str] | None = None,
+        exclude_template_keys: list[str] | None = None,
+    ) -> Any:
+        """Return one lightweight read-only Valrig article candidate from qApp."""
+        return await self.post_json(
+            "/articles/api/v1/articles/valrig-candidates/next",
+            payload={
+                "requested_form": requested_form,
+                "exclude_publication_ids": exclude_publication_ids or [],
+                "exclude_template_keys": exclude_template_keys or [],
+            },
+            access_token=access_token,
+        )
+
+    async def accept_valrig_article_candidate(
+        self,
+        *,
+        access_token: str,
+        template_key: str,
+        purpose: str,
+        publication_id: str | None = None,
+    ) -> Any:
+        """Claim an accepted Valrig candidate and create a seed QArticle."""
+        return await self.post_json(
+            "/articles/api/v1/articles/valrig-candidates/accept",
+            payload={
+                "publication_id": publication_id,
+                "template_key": template_key,
+                "purpose": purpose,
+            },
+            access_token=access_token,
+        )
+
+    async def get_article_source_context(
+        self,
+        *,
+        access_token: str,
+        article_id: str,
+    ) -> Any:
+        """Retrieve retained source context for a Valrig-backed QArticle."""
+        encoded_id = urllib.parse.quote(article_id, safe="")
+        return await self.get_json(
+            f"/articles/api/v1/articles/{encoded_id}/source-context",
+            access_token=access_token,
+        )
+
     async def get_internal_link_candidates(
         self,
         *,
