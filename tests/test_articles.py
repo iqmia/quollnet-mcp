@@ -14,10 +14,13 @@ from mcp.server.mcpserver.exceptions import ToolError
 from quollnet_mcp.services.article_authoring import build_authoring_data
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.tools.articles import (
+    accept_valrig_article_candidate,
     create_article_draft,
     edit_article_draft,
     get_article,
+    get_article_source_context,
     get_internal_link_candidates,
+    get_valrig_article_candidate,
     list_article_files,
     rename_article_file,
     replace_article_body_text,
@@ -309,12 +312,101 @@ class GetInternalLinkCandidatesTests(unittest.IsolatedAsyncioTestCase):
                 await get_internal_link_candidates(text="text")
 
 
+class ValrigArticleBootstrapToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_candidate_forwards_form_name_and_token(self) -> None:
+        expected = {"data": {"template": {"template_key": "material_submittal"}}}
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_valrig_article_candidate",
+                new=AsyncMock(return_value=expected),
+            ) as call,
+        ):
+            result = await get_valrig_article_candidate(
+                form_name="Material Submittal",
+            )
+
+        self.assertIs(result, expected)
+        call.assert_awaited_once_with(
+            access_token="qapp-user-token",
+            requested_form="Material Submittal",
+            exclude_publication_ids=None,
+            exclude_template_keys=None,
+        )
+
+    async def test_accept_forwards_exact_candidate_identity(self) -> None:
+        expected = {"data": {"article": {"id": "article-1"}}}
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.accept_valrig_article_candidate",
+                new=AsyncMock(return_value=expected),
+            ) as call,
+        ):
+            result = await accept_valrig_article_candidate(
+                template_key="material_submittal",
+                purpose="new",
+                publication_id=None,
+            )
+
+        self.assertIs(result, expected)
+        call.assert_awaited_once_with(
+            access_token="qapp-user-token",
+            template_key="material_submittal",
+            purpose="new",
+            publication_id=None,
+        )
+
+    async def test_source_context_forwards_article_id(self) -> None:
+        expected = {"data": {"type": "valrig"}}
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_article_source_context",
+                new=AsyncMock(return_value=expected),
+            ) as call,
+        ):
+            result = await get_article_source_context(article_id="article-1")
+
+        self.assertIs(result, expected)
+        call.assert_awaited_once_with(
+            access_token="qapp-user-token",
+            article_id="article-1",
+        )
+
+    async def test_candidate_qapp_error_becomes_tool_error(self) -> None:
+        with (
+            patch(
+                "quollnet_mcp.tools.articles.qapp_user_token",
+                return_value="qapp-user-token",
+            ),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.get_valrig_article_candidate",
+                new=AsyncMock(side_effect=QAppClientError("no candidate")),
+            ),
+        ):
+            with self.assertRaisesRegex(ToolError, "no candidate"):
+                await get_valrig_article_candidate()
+
+
 class AppRegistrationTests(unittest.TestCase):
     def test_get_internal_link_candidates_is_registered(self) -> None:
         import app as app_module
 
         tool_names = {tool.name for tool in app_module.mcp._tool_manager._tools.values()}
         self.assertIn("get_internal_link_candidates", tool_names)
+        self.assertIn("get_valrig_article_candidate", tool_names)
+        self.assertIn("accept_valrig_article_candidate", tool_names)
+        self.assertIn("get_article_source_context", tool_names)
 
 
 # ---------------------------------------------------------------------------
