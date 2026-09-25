@@ -333,6 +333,102 @@ async def create_article_draft(
     except QAppClientError as error:
         raise ToolError(str(error)) from error
 
+async def get_valrig_article_candidate(
+    form_name: Annotated[
+        str | None,
+        Field(
+            max_length=250,
+            description=(
+                "Optional Valrig Record Type/form name, code, slug, or template key. "
+                "Omit it to receive the next eligible candidate."
+            ),
+        ),
+    ] = None,
+    exclude_publication_ids: list[str] | None = None,
+    exclude_template_keys: list[str] | None = None,
+) -> dict[str, Any]:
+    """Return one lightweight Valrig article candidate without claiming it.
+
+    Use this when the user asks to start a new Valrig-sourced article. Showing or
+    rejecting a candidate does not consume it. Do not call
+    accept_valrig_article_candidate until the user has accepted the candidate.
+    """
+    access_token = await qapp_user_token()
+    try:
+        return await qapp_client.get_valrig_article_candidate(
+            access_token=access_token,
+            requested_form=form_name,
+            exclude_publication_ids=exclude_publication_ids,
+            exclude_template_keys=exclude_template_keys,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def accept_valrig_article_candidate(
+    template_key: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=250,
+            description="Exact template_key returned by get_valrig_article_candidate.",
+        ),
+    ],
+    purpose: Literal["new", "update"],
+    publication_id: Annotated[
+        str | None,
+        Field(
+            max_length=64,
+            description=(
+                "Publication ID returned with the candidate. It may be null for "
+                "a first-time Valrig Record Type."
+            ),
+        ),
+    ] = None,
+) -> dict[str, Any]:
+    """Accept a Valrig candidate and create its normal unpublished QArticle draft.
+
+    This is the commit point: qApp claims and validates the Valrig package, copies
+    its PDF/XLSX artifacts into the article files, creates a seed draft owned by
+    the connected user, and reports the generated draft back to Valrig. Continue
+    all writing with the normal QArticles tools afterwards.
+    """
+    access_token = await qapp_user_token()
+    try:
+        return await qapp_client.accept_valrig_article_candidate(
+            access_token=access_token,
+            template_key=template_key,
+            purpose=purpose,
+            publication_id=publication_id,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def get_article_source_context(
+    article_id: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=250,
+            description="ID of a Valrig-sourced QArticle draft.",
+        ),
+    ],
+) -> dict[str, Any]:
+    """Retrieve the retained Valrig template, guidance, artifact metadata, and
+    article attachment URLs for a Valrig-backed QArticle. Use this after the
+    bootstrap when the source material is needed for conversational authoring.
+    """
+    access_token = await qapp_user_token()
+    try:
+        return await qapp_client.get_article_source_context(
+            access_token=access_token,
+            article_id=article_id,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
 async def get_internal_link_candidates(
     text: Annotated[
         str,
