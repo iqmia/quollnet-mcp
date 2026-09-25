@@ -18,10 +18,13 @@ from quollnet_mcp.tools.cashflowpot import (
     list_cashflow_projects,
 )
 from quollnet_mcp.tools.articles import (
+    accept_valrig_article_candidate,
     create_article_draft,
     edit_article_draft,
     get_article,
+    get_article_source_context,
     get_internal_link_candidates,
+    get_valrig_article_candidate,
     list_article_files,
     rename_article_file,
     replace_article_body_text,
@@ -377,6 +380,69 @@ mcp.tool(
         "openai/toolInvocation/invoked": "qTool published",
     },
 )(publish_qtool)
+
+
+mcp.tool(
+    name="get_valrig_article_candidate",
+    title="Get Valrig article candidate",
+    description=(
+        "Return one lightweight eligible Valrig Record Type for a new QArticle. "
+        "Optionally request a form by name/code/slug. This is read-only and does "
+        "not claim or consume the candidate."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
+        "openai/toolInvocation/invoking": "Finding a Valrig article candidate",
+        "openai/toolInvocation/invoked": "Valrig article candidate retrieved",
+    },
+)(get_valrig_article_candidate)
+
+
+mcp.tool(
+    name="accept_valrig_article_candidate",
+    title="Accept Valrig article candidate",
+    description=(
+        "Accept the exact Valrig candidate already shown to the user. qApp then "
+        "claims the source package, creates a normal unpublished QArticle draft, "
+        "copies its Valrig source documents into article files, and reports the "
+        "draft to Valrig. Call only after the user accepts the candidate."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
+        "openai/toolInvocation/invoking": "Creating Valrig-sourced article draft",
+        "openai/toolInvocation/invoked": "Valrig-sourced article draft created",
+    },
+)(accept_valrig_article_candidate)
+
+
+mcp.tool(
+    name="get_article_source_context",
+    title="Get QArticle source context",
+    description=(
+        "Retrieve retained Valrig Record Type structure, authoring guidance, "
+        "artifact metadata, and attachment URLs for a Valrig-sourced QArticle."
+    ),
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        open_world_hint=False,
+    ),
+    meta={
+        "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
+        "openai/toolInvocation/invoking": "Retrieving Valrig source context",
+        "openai/toolInvocation/invoked": "Valrig source context retrieved",
+    },
+)(get_article_source_context)
 
 
 mcp.tool(
