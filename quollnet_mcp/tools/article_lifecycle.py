@@ -41,7 +41,8 @@ async def validate_article_for_publish(
 
     qApp is authoritative. Hard errors make the article invalid; warnings are
     returned for editorial review but do not by themselves change publication
-    state.
+    state. This public check is also the MCP's health check after substantial
+    edits so the public tool surface remains compact.
     """
     access_token = await qapp_user_token()
     try:
@@ -56,7 +57,13 @@ async def validate_article_for_publish(
 async def recheck_article(
     article_id: Annotated[str, _ARTICLE_ID],
 ) -> dict[str, Any]:
-    """Run qApp's deterministic article health checks after editing."""
+    """Run qApp's deterministic article health checks after editing.
+
+    Kept as an internal callable for tests and future server-side workflows. It
+    is intentionally not advertised as a separate MCP tool because the public
+    validate_article_for_publish tool already exposes the same health contract
+    needed by connected models.
+    """
     access_token = await qapp_user_token()
     try:
         return await qapp_client.get_json(
@@ -175,11 +182,11 @@ def register_article_lifecycle_tools(mcp: MCPServer) -> None:
 
     mcp.tool(
         name="validate_article_for_publish",
-        title="Validate Quollnet article for publication",
+        title="Check Quollnet article health and publication readiness",
         description=(
-            "Run qApp's authoritative publication-readiness validation for one "
-            "article. Use this before publication to inspect hard errors and "
-            "editorial warnings."
+            "Run qApp's authoritative article health/publication-readiness checks "
+            "for one article. Use after substantial edits and before publication "
+            "to inspect hard errors and editorial warnings."
         ),
         annotations=ToolAnnotations(
             read_only_hint=True,
@@ -188,29 +195,10 @@ def register_article_lifecycle_tools(mcp: MCPServer) -> None:
         ),
         meta={
             "securitySchemes": security,
-            "openai/toolInvocation/invoking": "Validating article",
-            "openai/toolInvocation/invoked": "Article validation complete",
+            "openai/toolInvocation/invoking": "Checking article",
+            "openai/toolInvocation/invoked": "Article check complete",
         },
     )(validate_article_for_publish)
-
-    mcp.tool(
-        name="recheck_article",
-        title="Recheck Quollnet article",
-        description=(
-            "Run qApp's deterministic article health checks after editing and "
-            "return structured errors, warnings, and check results."
-        ),
-        annotations=ToolAnnotations(
-            read_only_hint=True,
-            destructive_hint=False,
-            open_world_hint=False,
-        ),
-        meta={
-            "securitySchemes": security,
-            "openai/toolInvocation/invoking": "Rechecking article",
-            "openai/toolInvocation/invoked": "Article recheck complete",
-        },
-    )(recheck_article)
 
     mcp.tool(
         name="publish_article",
