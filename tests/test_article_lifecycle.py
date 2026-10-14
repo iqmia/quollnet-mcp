@@ -61,7 +61,7 @@ class ArticleHealthToolTests(unittest.IsolatedAsyncioTestCase):
             access_token="qapp-user-token",
         )
 
-    async def test_recheck_article_uses_encoded_article_route(self) -> None:
+    async def test_recheck_article_remains_available_internally(self) -> None:
         expected = {"data": {"article_id": "article/1", "checks": {}}}
         with (
             patch(
@@ -235,7 +235,7 @@ class ArticleLifecycleMutationTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ArticleLifecycleRegistrationTests(unittest.TestCase):
-    def test_article_lifecycle_tools_are_registered(self) -> None:
+    def test_article_lifecycle_tools_are_registered_without_separate_recheck(self) -> None:
         import app as app_module
 
         tool_names = {
@@ -243,11 +243,12 @@ class ArticleLifecycleRegistrationTests(unittest.TestCase):
         }
         self.assertIn("list_article_topics", tool_names)
         self.assertIn("validate_article_for_publish", tool_names)
-        self.assertIn("recheck_article", tool_names)
+        self.assertNotIn("recheck_article", tool_names)
         self.assertIn("publish_article", tool_names)
         self.assertIn("unpublish_article", tool_names)
         self.assertIn("archive_article", tool_names)
         self.assertIn("restore_article", tool_names)
+        self.assertEqual(len(tool_names), 32)
 
 
 if __name__ == "__main__":
