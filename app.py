@@ -14,6 +14,7 @@ from quollnet_mcp.dependencies import qapp_client, qauth_client, qflow_client
 from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
 from quollnet_mcp.instructions import SERVER_INSTRUCTIONS
+from quollnet_mcp.tools.article_lifecycle import register_article_lifecycle_tools
 from quollnet_mcp.tools.cashflowpot import (
     create_cashflow,
     list_cashflow_projects,
@@ -69,6 +70,7 @@ mcp = MCPServer(
         required_scopes=["mcp:connect"],
     ),
 )
+register_article_lifecycle_tools(mcp)
 
 # Define a function to return the current service status, including the service 
 # name, version, and status.
