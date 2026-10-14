@@ -29,8 +29,8 @@ class AppTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("qApp is authoritative", instructions)
         self.assertIn("get_article_authoring_policy", instructions)
         self.assertIn("preserve its existing slug", instructions)
+        self.assertIn("recheck_article", instructions)
         self.assertIn("validate_article_for_publish", instructions)
-        self.assertNotIn("recheck_article", instructions)
         self.assertIn("Never hard-delete", instructions)
 
 
