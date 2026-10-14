@@ -9,7 +9,7 @@ os.environ.setdefault("CASHFLOWPOT_APP_ID", "cashflowpot-test-app")
 
 from mcp.server.mcpserver.exceptions import ToolError
 from quollnet_mcp.services.qapp_client import QAppClientError
-from quollnet_mcp.tools.articles import (
+from quollnet_mcp.tools.article_lifecycle import (
     list_article_topics,
     recheck_article,
     validate_article_for_publish,
@@ -17,71 +17,74 @@ from quollnet_mcp.tools.articles import (
 
 
 class ArticleHealthToolTests(unittest.IsolatedAsyncioTestCase):
-    async def test_list_article_topics_forwards_qapp_token(self) -> None:
+    async def test_list_article_topics_uses_qapp_registry_route(self) -> None:
         expected = {"message": "ok", "data": [{"slug": "qa-qc"}]}
         with (
             patch(
-                "quollnet_mcp.tools.articles.qapp_user_token",
+                "quollnet_mcp.tools.article_lifecycle.qapp_user_token",
                 return_value="qapp-user-token",
             ),
             patch(
-                "quollnet_mcp.tools.articles.qapp_client.list_article_topics",
+                "quollnet_mcp.tools.article_lifecycle.qapp_client.get_json",
                 new=AsyncMock(return_value=expected),
             ) as call,
         ):
             result = await list_article_topics()
 
         self.assertIs(result, expected)
-        call.assert_awaited_once_with(access_token="qapp-user-token")
-
-    async def test_validate_article_for_publish_forwards_article_id(self) -> None:
-        expected = {"data": {"article_id": "article-1", "valid": True}}
-        with (
-            patch(
-                "quollnet_mcp.tools.articles.qapp_user_token",
-                return_value="qapp-user-token",
-            ),
-            patch(
-                "quollnet_mcp.tools.articles.qapp_client.validate_article_for_publish",
-                new=AsyncMock(return_value=expected),
-            ) as call,
-        ):
-            result = await validate_article_for_publish(article_id="article-1")
-
-        self.assertIs(result, expected)
         call.assert_awaited_once_with(
+            "/articles/api/v1/article-topics",
             access_token="qapp-user-token",
-            article_id="article-1",
         )
 
-    async def test_recheck_article_forwards_article_id(self) -> None:
-        expected = {"data": {"article_id": "article-1", "checks": {}}}
+    async def test_validate_article_for_publish_uses_encoded_article_route(self) -> None:
+        expected = {"data": {"article_id": "article/1", "valid": True}}
         with (
             patch(
-                "quollnet_mcp.tools.articles.qapp_user_token",
+                "quollnet_mcp.tools.article_lifecycle.qapp_user_token",
                 return_value="qapp-user-token",
             ),
             patch(
-                "quollnet_mcp.tools.articles.qapp_client.recheck_article",
+                "quollnet_mcp.tools.article_lifecycle.qapp_client.get_json",
                 new=AsyncMock(return_value=expected),
             ) as call,
         ):
-            result = await recheck_article(article_id="article-1")
+            result = await validate_article_for_publish(article_id="article/1")
 
         self.assertIs(result, expected)
         call.assert_awaited_once_with(
+            "/articles/api/v1/articles/article%2F1/validate",
             access_token="qapp-user-token",
-            article_id="article-1",
+        )
+
+    async def test_recheck_article_uses_encoded_article_route(self) -> None:
+        expected = {"data": {"article_id": "article/1", "checks": {}}}
+        with (
+            patch(
+                "quollnet_mcp.tools.article_lifecycle.qapp_user_token",
+                return_value="qapp-user-token",
+            ),
+            patch(
+                "quollnet_mcp.tools.article_lifecycle.qapp_client.get_json",
+                new=AsyncMock(return_value=expected),
+            ) as call,
+        ):
+            result = await recheck_article(article_id="article/1")
+
+        self.assertIs(result, expected)
+        call.assert_awaited_once_with(
+            "/articles/api/v1/articles/article%2F1/recheck",
+            access_token="qapp-user-token",
         )
 
     async def test_health_qapp_error_becomes_tool_error(self) -> None:
         with (
             patch(
-                "quollnet_mcp.tools.articles.qapp_user_token",
+                "quollnet_mcp.tools.article_lifecycle.qapp_user_token",
                 return_value="qapp-user-token",
             ),
             patch(
-                "quollnet_mcp.tools.articles.qapp_client.recheck_article",
+                "quollnet_mcp.tools.article_lifecycle.qapp_client.get_json",
                 new=AsyncMock(side_effect=QAppClientError("permission denied")),
             ),
         ):
