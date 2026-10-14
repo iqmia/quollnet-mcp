@@ -13,6 +13,7 @@ from starlette.routing import Mount, Route
 from quollnet_mcp.dependencies import qapp_client, qauth_client, qflow_client
 from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
+from quollnet_mcp.instructions import SERVER_INSTRUCTIONS
 from quollnet_mcp.tools.cashflowpot import (
     create_cashflow,
     list_cashflow_projects,
@@ -55,6 +56,7 @@ settings = get_settings()
 mcp = MCPServer(
     SERVICE_NAME,
     version=SERVICE_VERSION,
+    instructions=SERVER_INSTRUCTIONS,
     token_verifier=QAuthTokenVerifier(
         issuer_url=settings.qauth_issuer_url,
         resource_uri=settings.mcp_resource_uri,
@@ -793,4 +795,3 @@ app = Starlette(
     ],
     lifespan=lifespan,
 )
-
