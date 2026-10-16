@@ -9,6 +9,7 @@ os.environ.setdefault("CASHFLOWPOT_APP_ID", "cashflowpot-test-app")
 
 from quollnet_mcp.cashflowpot.models import (
     ActivityInput,
+    ActivityUpdate,
     FinancingFacilityUpdate,
 )
 from quollnet_mcp.cashflowpot.tools.activities import create_activity
@@ -102,6 +103,10 @@ class CashflowPotActivityModelTests(unittest.TestCase):
         self.assertEqual(scheduled.start, 0)
         self.assertEqual(manual.cost_schedule_json["0"], 100)
         self.assertEqual(scheduled.cost_schedule_json["0"], 5000)
+
+    def test_activity_update_can_change_one_field_only(self) -> None:
+        update = ActivityUpdate(start=4)
+        self.assertEqual(update.model_dump(exclude_none=True), {"start": 4})
 
 
 class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
