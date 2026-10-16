@@ -8,9 +8,11 @@ resources from one process and one shared backend-client pool.
 from collections.abc import AsyncGenerator
 from contextlib import AsyncExitStack, asynccontextmanager
 
-from starlette.applications import Starlette
-from starlette.routing import Mount, Route
 from mcp.server.transport_security import TransportSecuritySettings
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse
+from starlette.routing import Mount, Route
 
 import app as legacy
 from quollnet_mcp.cashflowpot.server import build_cashflowpot_server
@@ -53,6 +55,26 @@ class CanonicalCashflowPotPathMiddleware:
         await self.application(scope, receive, send)
 
 
+async def cashflowpot_protected_resource_metadata(_: Request) -> JSONResponse:
+    """Expose RFC 9728 metadata for the mounted CashflowPot resource.
+
+    The MCP SDK creates this route inside its ASGI application. Because that
+    application is mounted at ``/cashflowpot``, the generated well-known route
+    is otherwise hidden below the mount even though clients are correctly told
+    to discover it at the host root.
+    """
+
+    return JSONResponse(
+        {
+            "resource": settings.cashflowpot_mcp_resource_uri,
+            "authorization_servers": [settings.qauth_issuer_url],
+            "scopes_supported": ["mcp:connect"],
+            "bearer_methods_supported": ["header"],
+        },
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @asynccontextmanager
 async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
     async with AsyncExitStack() as stack:
@@ -67,6 +89,11 @@ async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
 app = Starlette(
     routes=[
         Route("/health", legacy.health, methods=["GET"]),
+        Route(
+            "/.well-known/oauth-protected-resource/cashflowpot",
+            cashflowpot_protected_resource_metadata,
+            methods=["GET"],
+        ),
         Mount("/cashflowpot", app=_cashflowpot_http_app),
         Mount("/", app=legacy.mcp_http_app),
     ],
