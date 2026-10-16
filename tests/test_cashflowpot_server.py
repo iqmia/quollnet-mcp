@@ -55,7 +55,7 @@ class CashflowPotAudienceIsolationTests(unittest.IsolatedAsyncioTestCase):
                 "nbf": now - 1,
                 "exp": now + 600,
             },
-            cls.private_pem if False else self.private_pem,
+            self.private_pem,
             algorithm="RS256",
             headers={"kid": "test-app-id", "typ": "JWT"},
         )
