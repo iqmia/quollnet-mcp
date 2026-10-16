@@ -48,7 +48,7 @@ async def update_activity(
     return await call_qflow(lambda: qflow_client.update_activity(
         access_token=token,
         activity_id=activity_id,
-        payload=activity.model_dump(exclude_none=True),
+        payload=activity.model_dump(exclude_unset=True),
     ))
 
 
