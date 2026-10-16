@@ -2,6 +2,7 @@ import os
 import time
 import unittest
 
+import httpx
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -104,6 +105,30 @@ class CashflowPotMountTests(unittest.TestCase):
         self.assertIn("q_flow is authoritative", instructions)
         self.assertIn("periods are zero-based", instructions)
         self.assertNotIn("QArticles", instructions)
+
+
+class CashflowPotExactPathTests(unittest.IsolatedAsyncioTestCase):
+    async def test_exact_cashflowpot_path_does_not_redirect_to_trailing_slash(self) -> None:
+        from combined_app import app
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="https://mcp.quollnet.com",
+            follow_redirects=False,
+        ) as client:
+            response = await client.post(
+                "/cashflowpot",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {},
+                },
+            )
+
+        self.assertNotIn(response.status_code, (301, 302, 307, 308))
+        self.assertIsNone(response.headers.get("location"))
 
 
 if __name__ == "__main__":
