@@ -18,6 +18,7 @@ class Settings:
     service_version: str
     qauth_issuer_url: str
     mcp_resource_uri: str
+    cashflowpot_mcp_resource_uri: str
     qauth_app_id: str
     qauth_public_key: str
     qapp_app_id: str
@@ -47,6 +48,10 @@ def get_settings() -> Settings:
         service_version=os.getenv("QUOLLNET_VERSION", "0.1.0"),
         qauth_issuer_url=os.getenv("QAUTH_ISSUER_URL", "https://quollnet.com/api"),
         mcp_resource_uri=os.getenv("MCP_RESOURCE_URI", "https://mcp.quollnet.com/mcp"),
+        cashflowpot_mcp_resource_uri=os.getenv(
+            "CASHFLOWPOT_MCP_RESOURCE_URI",
+            "https://mcp.quollnet.com/cashflowpot",
+        ),
         qauth_app_id=qauth_app_id,
         qauth_public_key=qauth_public_key.replace("\\n", "\n"),
         qapp_app_id=qapp_app_id,
