@@ -149,9 +149,9 @@ class CashflowUpdate(BaseModel):
 class FinancingFacilityInput(BaseModel):
     """Facility source definition.
 
-    The backend owns exact validation because the valid fields depend on draw and
-    repayment methods. Extra fields are allowed so new q_flow facility options do
-    not require an MCP release merely to pass them through.
+    The backend owns cross-field validation because the required fields depend on
+    draw and repayment methods. The MCP schema still exposes every currently
+    supported q_flow source field so clients can discover and set them directly.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -167,6 +167,13 @@ class FinancingFacilityInput(BaseModel):
     interest_rate: float = Field(default=0, ge=0)
     fees: float = Field(default=0, ge=0)
     sweep_priority: int | None = Field(default=None, ge=0)
+    draw_schedule: dict[str, float] = Field(default_factory=dict)
+    repayment_schedule: dict[str, float] = Field(default_factory=dict)
+    advance_portion: float | None = Field(default=None, ge=0, le=1)
+    repayment_percent: float | None = Field(default=None, ge=0, le=1)
+    installment_start: int | None = Field(default=None, ge=0)
+    installment_interval: int | None = Field(default=None, ge=1)
+    installment_count: int | None = Field(default=None, ge=1)
 
 
 class FinancingFacilityUpdate(BaseModel):
@@ -183,6 +190,13 @@ class FinancingFacilityUpdate(BaseModel):
     interest_rate: float | None = Field(default=None, ge=0)
     fees: float | None = Field(default=None, ge=0)
     sweep_priority: int | None = Field(default=None, ge=0)
+    draw_schedule: dict[str, float] | None = None
+    repayment_schedule: dict[str, float] | None = None
+    advance_portion: float | None = Field(default=None, ge=0, le=1)
+    repayment_percent: float | None = Field(default=None, ge=0, le=1)
+    installment_start: int | None = Field(default=None, ge=0)
+    installment_interval: int | None = Field(default=None, ge=1)
+    installment_count: int | None = Field(default=None, ge=1)
 
 
 class PortableCashflowDocument(BaseModel):
