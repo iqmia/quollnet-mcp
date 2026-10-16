@@ -134,6 +134,22 @@ class FinancingFacilityInput(BaseModel):
     sweep_priority: int | None = Field(default=None, ge=0)
 
 
+class FinancingFacilityUpdate(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    type: str | None = None
+    draw_method: str | None = None
+    repayment_method: str | None = None
+    start: int | None = Field(default=None, ge=0)
+    end: int | None = Field(default=None, ge=0)
+    limit: float | None = Field(default=None, ge=0)
+    revolving: bool | None = None
+    interest_rate: float | None = Field(default=None, ge=0)
+    fees: float | None = Field(default=None, ge=0)
+    sweep_priority: int | None = Field(default=None, ge=0)
+
+
 class PortableCashflowDocument(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
