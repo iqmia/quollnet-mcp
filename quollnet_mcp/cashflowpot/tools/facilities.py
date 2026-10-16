@@ -63,7 +63,7 @@ async def update_financing_facility(
         access_token=token,
         cashflow_id=cashflow_id,
         facility_id=facility_id,
-        payload=facility.model_dump(exclude_none=True),
+        payload=facility.model_dump(exclude_unset=True),
     ))
 
 
