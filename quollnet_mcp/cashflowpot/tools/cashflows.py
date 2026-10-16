@@ -54,7 +54,7 @@ async def update_cashflow(
     return await call_qflow(lambda: qflow_client.update_cashflow(
         access_token=token,
         cashflow_id=cashflow_id,
-        payload=cashflow.model_dump(exclude_none=True),
+        payload=cashflow.model_dump(exclude_unset=True),
     ))
 
 
