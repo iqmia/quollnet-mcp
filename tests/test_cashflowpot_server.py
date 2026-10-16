@@ -82,8 +82,9 @@ class CashflowPotAudienceIsolationTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CashflowPotMountTests(unittest.TestCase):
-    def test_app_mounts_dedicated_resource_before_existing_catch_all(self) -> None:
-        from app import app, cashflowpot_mcp, mcp
+    def test_combined_app_mounts_dedicated_resource_before_existing_catch_all(self) -> None:
+        from combined_app import app, cashflowpot_mcp
+        from app import mcp
 
         self.assertIsNot(cashflowpot_mcp, mcp)
         mounts = [
@@ -92,11 +93,12 @@ class CashflowPotMountTests(unittest.TestCase):
             if route.__class__.__name__ == "Mount"
         ]
         self.assertIn("/cashflowpot", mounts)
-        self.assertIn("", mounts)
-        self.assertLess(mounts.index("/cashflowpot"), mounts.index(""))
+        self.assertTrue("" in mounts or "/" in mounts)
+        central_path = "" if "" in mounts else "/"
+        self.assertLess(mounts.index("/cashflowpot"), mounts.index(central_path))
 
     def test_dedicated_server_has_cashflowpot_instructions_only(self) -> None:
-        from app import cashflowpot_mcp
+        from combined_app import cashflowpot_mcp
 
         instructions = cashflowpot_mcp.instructions or ""
         self.assertIn("q_flow is authoritative", instructions)
