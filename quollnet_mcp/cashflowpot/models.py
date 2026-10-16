@@ -24,8 +24,8 @@ class ActivityInput(BaseModel):
     """Source activity fields accepted by q_flow.
 
     q_flow remains authoritative for the detailed mode/distribution validation.
-    Manual Work and Scheduled Cost can provide cost_schedule_json instead of
-    relying on generated cost curves.
+    Manual Work and Scheduled Cost use a dense zero-based list for
+    ``cost_schedule_json``; the list index is the local activity period.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -34,7 +34,7 @@ class ActivityInput(BaseModel):
     activity_type: str | None = None
     activity_mode: str | None = Field(default=None, description="work or scheduled_cost")
     distribution_type: str | None = Field(default=None, description="s_curve, linear, or manual")
-    cost_schedule_json: dict[str, float] | list[float] | None = None
+    cost_schedule_json: list[float] | None = None
     cost: float | None = Field(default=None, gt=0)
     duration: int | None = Field(default=None, gt=0)
     duration_units: str | None = None
@@ -77,7 +77,7 @@ class ActivityUpdate(BaseModel):
     activity_type: str | None = None
     activity_mode: str | None = None
     distribution_type: str | None = None
-    cost_schedule_json: dict[str, float] | list[float] | None = None
+    cost_schedule_json: list[float] | None = None
     cost: float | None = Field(default=None, gt=0)
     duration: int | None = Field(default=None, gt=0)
     duration_units: str | None = None
