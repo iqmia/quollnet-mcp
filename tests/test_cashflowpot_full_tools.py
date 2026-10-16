@@ -13,7 +13,10 @@ from quollnet_mcp.cashflowpot.models import (
     FinancingFacilityUpdate,
 )
 from quollnet_mcp.cashflowpot.tools.activities import create_activity
-from quollnet_mcp.cashflowpot.tools.cashflows import export_cashflow_json
+from quollnet_mcp.cashflowpot.tools.cashflows import (
+    export_cashflow_json,
+    get_cashflow_results,
+)
 from quollnet_mcp.cashflowpot.tools.exports import export_cashflow_excel
 from quollnet_mcp.cashflowpot.tools.facilities import update_financing_facility
 
@@ -136,6 +139,43 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["start"], 0)
         self.assertEqual(payload["cost_schedule_json"], {"0": 25000.0, "2": 10000.0})
         self.assertNotIn("cash_flow_json", payload)
+
+    async def test_results_use_qflow_serialized_financing_keys(self) -> None:
+        snapshot = {
+            "id": "cf-1",
+            "unit_id": "unit-1",
+            "name": "Tender",
+            "summary": {"peak_pre_financing_need": 125000},
+            "workflow": [10, 20],
+            "inflow": [0, 50],
+            "outflow": [25, 30],
+            "netflow": [-25, 20],
+            "pre_financing_balance": [-25, -5],
+            "facility_rows": [{"id": "fac-1"}],
+            "facility_inflow": [25, 0],
+            "facility_outflow": [0, 10],
+            "facility_interest": [0, 1],
+            "facility_fees": [2, 0],
+            "funded_netflow": [0, 9],
+            "unfunded_shortfall": [0, 0],
+            "outflow_with_interest": [0, 9],
+        }
+        with patch(
+            "quollnet_mcp.cashflowpot.tools.cashflows.get_cashflow",
+            new=AsyncMock(return_value={"data": snapshot}),
+        ):
+            result = await get_cashflow_results("unit-1", "cf-1")
+
+        for key in (
+            "facility_inflow",
+            "facility_outflow",
+            "funded_netflow",
+            "facility_interest",
+            "facility_fees",
+        ):
+            self.assertEqual(result[key], snapshot[key])
+        self.assertNotIn("facility_draws", result)
+        self.assertNotIn("principal_repayments", result)
 
     async def test_facility_update_uses_atomic_backend_operation(self) -> None:
         expected = {"facility": {"id": "fac-1", "limit": 250000}}
