@@ -62,8 +62,43 @@ class ActivityInput(BaseModel):
         return self
 
 
-class ActivityUpdate(ActivityInput):
-    pass
+class ActivityUpdate(BaseModel):
+    """Partial Activity update.
+
+    q_flow merges these fields into the existing Activity and then performs the
+    authoritative cross-field validation/calculation. Requiring a complete
+    Activity here would make simple edits such as changing only ``start``
+    impossible.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    activity_type: str | None = None
+    activity_mode: str | None = None
+    distribution_type: str | None = None
+    cost_schedule_json: dict[str, float] | list[float] | None = None
+    cost: float | None = Field(default=None, gt=0)
+    duration: int | None = Field(default=None, gt=0)
+    duration_units: str | None = None
+    start: int | None = Field(default=None, ge=0)
+    advance: float | None = Field(default=None, ge=0, le=1)
+    retention: float | None = Field(default=None, ge=0, le=1)
+    release_retention_eop: float | None = Field(default=None, ge=0, le=1)
+    dlp: int | None = Field(default=None, ge=0)
+    duration_for_payment: int | None = Field(default=None, ge=0)
+    work_in_excess: float | None = Field(default=None, ge=0, le=1)
+    mobilization_period: int | None = Field(default=None, ge=0)
+    subcontracted: float | None = Field(default=None, ge=0, le=1)
+    skew: float | None = Field(default=None, gt=-1, lt=1)
+    no_billing_period: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_supplied_percentages(self) -> "ActivityUpdate":
+        if self.advance is not None and self.retention is not None:
+            if self.advance + self.retention > 1:
+                raise ValueError("activity advance + retention must not exceed 1")
+        return self
 
 
 class CashflowInput(BaseModel):
