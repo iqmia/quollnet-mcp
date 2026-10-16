@@ -55,7 +55,7 @@ class CashflowPotAudienceIsolationTests(unittest.IsolatedAsyncioTestCase):
                 "nbf": now - 1,
                 "exp": now + 600,
             },
-            self.private_pem,
+            cls.private_pem if False else self.private_pem,
             algorithm="RS256",
             headers={"kid": "test-app-id", "typ": "JWT"},
         )
@@ -132,6 +132,26 @@ class CashflowPotExactPathTests(unittest.IsolatedAsyncioTestCase):
         # actually mounted, even if /cashflowpot/ happens to work.
         self.assertIn(response.status_code, (401, 403))
         self.assertIsNone(response.headers.get("location"))
+
+    async def test_cashflowpot_protected_resource_metadata_is_exposed_at_rfc_path(self) -> None:
+        from combined_app import app
+
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="https://mcp.quollnet.com",
+            follow_redirects=False,
+        ) as client:
+            response = await client.get(
+                "/.well-known/oauth-protected-resource/cashflowpot"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["resource"], "https://mcp.quollnet.com/cashflowpot")
+        self.assertEqual(body["authorization_servers"], ["https://quollnet.com/api"])
+        self.assertEqual(body["scopes_supported"], ["mcp:connect"])
+        self.assertEqual(body["bearer_methods_supported"], ["header"])
 
 
 if __name__ == "__main__":
