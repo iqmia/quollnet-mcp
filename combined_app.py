@@ -31,6 +31,28 @@ _cashflowpot_http_app = cashflowpot_mcp.streamable_http_app(
 )
 
 
+class CanonicalCashflowPotPathMiddleware:
+    """Internally normalize the exact resource URI without an HTTP redirect.
+
+    Starlette ``Mount('/cashflowpot', ...)`` dispatches subpaths such as
+    ``/cashflowpot/`` but does not dispatch the exact no-trailing-slash path.
+    QAuth and MCP deliberately use the canonical resource URI
+    ``https://mcp.quollnet.com/cashflowpot``. Rewriting only the ASGI routing
+    path keeps that public URI exact while letting the mounted MCP app receive
+    its expected inner ``/`` path.
+    """
+
+    def __init__(self, application) -> None:
+        self.application = application
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope.get("type") in {"http", "websocket"} and scope.get("path") == "/cashflowpot":
+            scope = dict(scope)
+            scope["path"] = "/cashflowpot/"
+            scope["raw_path"] = b"/cashflowpot/"
+        await self.application(scope, receive, send)
+
+
 @asynccontextmanager
 async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
     async with AsyncExitStack() as stack:
@@ -50,3 +72,4 @@ app = Starlette(
     ],
     lifespan=lifespan,
 )
+app.add_middleware(CanonicalCashflowPotPathMiddleware)
