@@ -1,5 +1,5 @@
 import urllib.parse
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import TracebackType
 from typing import Any
 
@@ -35,6 +35,10 @@ class QFlowClient:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+    @staticmethod
+    def _quote(value: str) -> str:
+        return urllib.parse.quote(value, safe="")
 
     async def _request_json(
         self,
@@ -79,31 +83,189 @@ class QFlowClient:
         except ValueError as error:
             raise QFlowClientError("q_flow returned invalid JSON") from error
 
-    async def list_projects(
-        self,
-        *,
-        access_token: str,
-        page: int = 1,
-        per_page: int = 25,
-    ) -> Any:
+    # Projects
+    async def list_projects(self, *, access_token: str, page: int = 1, per_page: int = 25) -> Any:
         return await self._request_json(
-            "GET",
-            "/projects",
-            access_token=access_token,
+            "GET", "/projects", access_token=access_token,
             params={"page": page, "per_page": per_page},
         )
 
+    async def get_project(self, *, access_token: str, unit_id: str) -> Any:
+        return await self._request_json(
+            "GET", f"/project/{self._quote(unit_id)}", access_token=access_token
+        )
+
+    async def create_project(self, *, access_token: str, payload: Mapping[str, Any]) -> Any:
+        return await self._request_json(
+            "POST", "/new_project", access_token=access_token, payload=payload
+        )
+
+    async def update_project(self, *, access_token: str, unit_id: str, payload: Mapping[str, Any]) -> Any:
+        return await self._request_json(
+            "PUT", f"/update_project/{self._quote(unit_id)}",
+            access_token=access_token, payload=payload,
+        )
+
+    async def delete_project(self, *, access_token: str, unit_id: str) -> Any:
+        return await self._request_json(
+            "DELETE", f"/delete_project/{self._quote(unit_id)}", access_token=access_token
+        )
+
+    async def restore_project(self, *, access_token: str, unit_id: str) -> Any:
+        return await self._request_json(
+            "PUT", f"/restore_project/{self._quote(unit_id)}", access_token=access_token
+        )
+
+    async def hard_delete_project(self, *, access_token: str, unit_id: str) -> Any:
+        return await self._request_json(
+            "DELETE", f"/hard_delete_project/{self._quote(unit_id)}", access_token=access_token
+        )
+
+    # Cashflows
+    async def get_cashflow(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "GET", f"/cashflow/{self._quote(cashflow_id)}", access_token=access_token
+        )
+
+    async def create_cashflow(self, *, access_token: str, unit_id: str, payload: Mapping[str, Any]) -> Any:
+        return await self._request_json(
+            "POST", f"/project/{self._quote(unit_id)}/cashflows",
+            access_token=access_token, payload=payload,
+        )
+
+    async def update_cashflow(self, *, access_token: str, cashflow_id: str, payload: Mapping[str, Any]) -> Any:
+        return await self._request_json(
+            "PUT", f"/cashflow/{self._quote(cashflow_id)}",
+            access_token=access_token, payload=payload,
+        )
+
+    async def delete_cashflow(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "DELETE", f"/cashflow/{self._quote(cashflow_id)}", access_token=access_token
+        )
+
+    async def restore_cashflow(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "PUT", f"/cashflow/{self._quote(cashflow_id)}/restore", access_token=access_token
+        )
+
+    async def hard_delete_cashflow(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "DELETE", f"/cashflow/{self._quote(cashflow_id)}/hard", access_token=access_token
+        )
+
     async def import_cashflow(
-        self,
-        *,
-        access_token: str,
-        unit_id: str,
+        self, *, access_token: str, unit_id: str, payload: Mapping[str, Any]
+    ) -> Any:
+        return await self._request_json(
+            "POST", f"/project/{self._quote(unit_id)}/cashflows/import",
+            access_token=access_token, payload=payload,
+        )
+
+    async def export_cashflow(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "GET", f"/cashflow/{self._quote(cashflow_id)}/export", access_token=access_token
+        )
+
+    # Activities
+    async def get_activity_types(self, *, access_token: str) -> Any:
+        return await self._request_json("GET", "/activities/types", access_token=access_token)
+
+    async def get_activity(self, *, access_token: str, activity_id: str) -> Any:
+        return await self._request_json(
+            "GET", f"/activity/{self._quote(activity_id)}", access_token=access_token
+        )
+
+    async def create_activity(self, *, access_token: str, cashflow_id: str, payload: Mapping[str, Any]) -> Any:
+        return await self._request_json(
+            "POST", f"/new_activity/{self._quote(cashflow_id)}",
+            access_token=access_token, payload=payload,
+        )
+
+    async def update_activity(self, *, access_token: str, activity_id: str, payload: Mapping[str, Any]) -> Any:
+        return await self._request_json(
+            "PUT", f"/update_activity/{self._quote(activity_id)}",
+            access_token=access_token, payload=payload,
+        )
+
+    async def delete_activity(self, *, access_token: str, activity_id: str) -> Any:
+        return await self._request_json(
+            "DELETE", f"/delete_activity/{self._quote(activity_id)}", access_token=access_token
+        )
+
+    async def restore_activity(self, *, access_token: str, activity_id: str) -> Any:
+        return await self._request_json(
+            "PUT", f"/restore_activity/{self._quote(activity_id)}", access_token=access_token
+        )
+
+    async def restore_activities(self, *, access_token: str, activity_ids: Sequence[str]) -> Any:
+        return await self._request_json(
+            "PUT", "/restore_activities", access_token=access_token,
+            payload={"data": list(activity_ids)},
+        )
+
+    async def hard_delete_activity(self, *, access_token: str, activity_id: str) -> Any:
+        return await self._request_json(
+            "DELETE", f"/hard_delete_activity/{self._quote(activity_id)}", access_token=access_token
+        )
+
+    async def list_deleted_activities(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "GET", f"/deleted_activities/{self._quote(cashflow_id)}", access_token=access_token
+        )
+
+    # Financing facilities
+    async def list_financing_facility_presets(self, *, access_token: str) -> Any:
+        return await self._request_json(
+            "GET", "/financing-facility-presets", access_token=access_token
+        )
+
+    async def list_financing_facilities(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "GET", f"/cashflow/{self._quote(cashflow_id)}/facilities", access_token=access_token
+        )
+
+    async def get_financing_facility(self, *, access_token: str, cashflow_id: str, facility_id: str) -> Any:
+        return await self._request_json(
+            "GET",
+            f"/cashflow/{self._quote(cashflow_id)}/facilities/{self._quote(facility_id)}",
+            access_token=access_token,
+        )
+
+    async def add_financing_facility(self, *, access_token: str, cashflow_id: str, payload: Mapping[str, Any]) -> Any:
+        return await self._request_json(
+            "POST", f"/cashflow/{self._quote(cashflow_id)}/facilities",
+            access_token=access_token, payload=payload,
+        )
+
+    async def update_financing_facility(
+        self, *, access_token: str, cashflow_id: str, facility_id: str,
         payload: Mapping[str, Any],
     ) -> Any:
-        safe_unit_id = urllib.parse.quote(unit_id, safe="")
         return await self._request_json(
-            "POST",
-            f"/project/{safe_unit_id}/cashflows/import",
+            "PUT",
+            f"/cashflow/{self._quote(cashflow_id)}/facilities/{self._quote(facility_id)}",
+            access_token=access_token, payload=payload,
+        )
+
+    async def delete_financing_facility(self, *, access_token: str, cashflow_id: str, facility_id: str) -> Any:
+        return await self._request_json(
+            "DELETE",
+            f"/cashflow/{self._quote(cashflow_id)}/facilities/{self._quote(facility_id)}",
             access_token=access_token,
-            payload=payload,
+        )
+
+    async def set_financing_facility_order(
+        self, *, access_token: str, cashflow_id: str, facility_ids: Sequence[str]
+    ) -> Any:
+        return await self._request_json(
+            "PUT", f"/cashflow/{self._quote(cashflow_id)}/facilities/order",
+            access_token=access_token, payload={"facility_ids": list(facility_ids)},
+        )
+
+    # Exports
+    async def request_excel_export(self, *, access_token: str, cashflow_id: str) -> Any:
+        return await self._request_json(
+            "POST", f"/cashflow/{self._quote(cashflow_id)}/excel-export",
+            access_token=access_token,
         )
