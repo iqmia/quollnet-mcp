@@ -19,6 +19,7 @@ class CashflowPotBackendClientTests(unittest.IsolatedAsyncioTestCase):
         def handler(request: httpx.Request) -> httpx.Response:
             seen["method"] = request.method
             seen["path"] = request.url.path
+            seen["raw_path"] = request.url.raw_path.decode("ascii")
             seen["query"] = dict(request.url.params)
             seen["authorization"] = request.headers.get("Authorization")
             seen["json"] = (
@@ -49,7 +50,7 @@ class CashflowPotBackendClientTests(unittest.IsolatedAsyncioTestCase):
             )
         )
         self.assertEqual(seen["method"], "GET")
-        self.assertEqual(seen["path"], "/api/project/unit/with%20space")
+        self.assertEqual(seen["raw_path"], "/api/project/unit%2Fwith%20space")
 
     async def test_cashflow_update_and_export_routes(self) -> None:
         seen = await self._client_call(
