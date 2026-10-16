@@ -10,12 +10,14 @@ os.environ.setdefault("CASHFLOWPOT_APP_ID", "cashflowpot-test-app")
 from quollnet_mcp.cashflowpot.models import (
     ActivityInput,
     ActivityUpdate,
+    CashflowUpdate,
     FinancingFacilityUpdate,
 )
-from quollnet_mcp.cashflowpot.tools.activities import create_activity
+from quollnet_mcp.cashflowpot.tools.activities import create_activity, update_activity
 from quollnet_mcp.cashflowpot.tools.cashflows import (
     export_cashflow_json,
     get_cashflow_results,
+    update_cashflow,
 )
 from quollnet_mcp.cashflowpot.tools.exports import export_cashflow_excel
 from quollnet_mcp.cashflowpot.tools.facilities import update_financing_facility
@@ -109,7 +111,7 @@ class CashflowPotActivityModelTests(unittest.TestCase):
 
     def test_activity_update_can_change_one_field_only(self) -> None:
         update = ActivityUpdate(start=4)
-        self.assertEqual(update.model_dump(exclude_none=True), {"start": 4})
+        self.assertEqual(update.model_dump(exclude_unset=True), {"start": 4})
 
 
 class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
@@ -177,6 +179,52 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("facility_draws", result)
         self.assertNotIn("principal_repayments", result)
 
+    async def test_cashflow_update_preserves_explicit_null_to_clear_curve(self) -> None:
+        expected = {"data": {"id": "cf-1", "inflow_curve_type": None}}
+        with (
+            patch(
+                "quollnet_mcp.cashflowpot.tools.cashflows.cashflowpot_token",
+                new=AsyncMock(return_value="unit-token"),
+            ),
+            patch(
+                "quollnet_mcp.cashflowpot.tools.cashflows.qflow_client.update_cashflow",
+                new=AsyncMock(return_value=expected),
+            ) as call,
+        ):
+            result = await update_cashflow(
+                "unit-1", "cf-1", CashflowUpdate(inflow_curve_type=None)
+            )
+
+        self.assertIs(result, expected)
+        call.assert_awaited_once_with(
+            access_token="unit-token",
+            cashflow_id="cf-1",
+            payload={"inflow_curve_type": None},
+        )
+
+    async def test_activity_update_preserves_explicit_null(self) -> None:
+        expected = {"cashflow": {"id": "cf-1"}}
+        with (
+            patch(
+                "quollnet_mcp.cashflowpot.tools.activities.cashflowpot_token",
+                new=AsyncMock(return_value="unit-token"),
+            ),
+            patch(
+                "quollnet_mcp.cashflowpot.tools.activities.qflow_client.update_activity",
+                new=AsyncMock(return_value=expected),
+            ) as call,
+        ):
+            result = await update_activity(
+                "unit-1", "a-1", ActivityUpdate(cost_schedule_json=None)
+            )
+
+        self.assertIs(result, expected)
+        call.assert_awaited_once_with(
+            access_token="unit-token",
+            activity_id="a-1",
+            payload={"cost_schedule_json": None},
+        )
+
     async def test_facility_update_uses_atomic_backend_operation(self) -> None:
         expected = {"facility": {"id": "fac-1", "limit": 250000}}
         with (
@@ -202,6 +250,33 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
             cashflow_id="cf-1",
             facility_id="fac-1",
             payload={"limit": 250000.0},
+        )
+
+    async def test_facility_update_preserves_explicit_null_for_unlimited_limit(self) -> None:
+        expected = {"facility": {"id": "fac-1", "limit": None}}
+        with (
+            patch(
+                "quollnet_mcp.cashflowpot.tools.facilities.cashflowpot_token",
+                new=AsyncMock(return_value="unit-token"),
+            ),
+            patch(
+                "quollnet_mcp.cashflowpot.tools.facilities.qflow_client.update_financing_facility",
+                new=AsyncMock(return_value=expected),
+            ) as call,
+        ):
+            result = await update_financing_facility(
+                "unit-1",
+                "cf-1",
+                "fac-1",
+                FinancingFacilityUpdate(limit=None),
+            )
+
+        self.assertIs(result, expected)
+        call.assert_awaited_once_with(
+            access_token="unit-token",
+            cashflow_id="cf-1",
+            facility_id="fac-1",
+            payload={"limit": None},
         )
 
     async def test_portable_json_is_backend_returned_not_rebuilt(self) -> None:
