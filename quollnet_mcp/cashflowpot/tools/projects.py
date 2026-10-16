@@ -65,7 +65,10 @@ async def restore_cashflow_project(unit_id: str) -> dict[str, Any]:
 
 async def hard_delete_cashflow_project(unit_id: str) -> dict[str, Any]:
     """Permanently delete a CashflowPot project and its local scenarios."""
-    token = await cashflowpot_token(unit_id)
+    # Hard deletion is valid after soft deletion, when QAuth may no longer mint
+    # a Unit token. Use the normal CashflowPot app token and let q_flow/QAuth
+    # authorize deletion of the requested Unit, matching project restoration.
+    token = await cashflowpot_token()
     return await call_qflow(lambda: qflow_client.hard_delete_project(
         access_token=token, unit_id=unit_id
     ))
