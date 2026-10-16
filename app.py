@@ -15,10 +15,6 @@ from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
 from quollnet_mcp.instructions import SERVER_INSTRUCTIONS
 from quollnet_mcp.tools.article_lifecycle import register_article_lifecycle_tools
-from quollnet_mcp.tools.cashflowpot import (
-    create_cashflow,
-    list_cashflow_projects,
-)
 from quollnet_mcp.tools.articles import (
     accept_valrig_article_candidate,
     create_article_draft,
@@ -706,54 +702,6 @@ mcp.tool(
         "openai/toolInvocation/invoked": "Article hero image updated",
     },
 )(set_article_hero_image)
-
-
-mcp.tool(
-    name="list_cashflow_projects",
-    title="List CashflowPot projects",
-    description=(
-        "List the authenticated user's CashflowPot projects (QAuth Units) and "
-        "their existing cashflow scenarios. Use the returned project id as the "
-        "unit_id for CashflowPot creation tools."
-    ),
-    annotations=ToolAnnotations(
-        read_only_hint=True,
-        destructive_hint=False,
-        open_world_hint=False,
-    ),
-    meta={
-        "securitySchemes": [
-            {"type": "oauth2", "scopes": ["mcp:connect"]}
-        ],
-        "openai/toolInvocation/invoking": "Retrieving CashflowPot projects",
-        "openai/toolInvocation/invoked": "CashflowPot projects retrieved",
-    },
-)(list_cashflow_projects)
-
-
-mcp.tool(
-    name="create_cashflow",
-    title="Create CashflowPot scenario",
-    description=(
-        "Create and calculate a CashflowPot scenario in an existing project. "
-        "Provide project commercial assumptions and activities using the "
-        "CashflowPot portable input model. Percentages are fractions (0.10 = 10%). "
-        "q_flow validates the inputs and remains authoritative for all calculated "
-        "cashflow series and KPIs."
-    ),
-    annotations=ToolAnnotations(
-        read_only_hint=False,
-        destructive_hint=False,
-        open_world_hint=False,
-    ),
-    meta={
-        "securitySchemes": [
-            {"type": "oauth2", "scopes": ["mcp:connect"]}
-        ],
-        "openai/toolInvocation/invoking": "Creating CashflowPot scenario",
-        "openai/toolInvocation/invoked": "CashflowPot scenario created",
-    },
-)(create_cashflow)
 
 
 # Define a health check endpoint that returns the current service status in JSON format.
