@@ -94,20 +94,20 @@ class CashflowPotActivityModelTests(unittest.TestCase):
             name="Manual Work",
             activity_mode="work",
             distribution_type="manual",
-            cost_schedule_json={"0": 100, "1": 200},
+            cost_schedule_json=[100, 200],
             start=0,
         )
         scheduled = ActivityInput(
             name="LC Material",
             activity_mode="scheduled_cost",
             distribution_type="manual",
-            cost_schedule_json={"0": 5000},
+            cost_schedule_json=[5000],
             start=0,
         )
         self.assertEqual(manual.start, 0)
         self.assertEqual(scheduled.start, 0)
-        self.assertEqual(manual.cost_schedule_json["0"], 100)
-        self.assertEqual(scheduled.cost_schedule_json["0"], 5000)
+        self.assertEqual(manual.cost_schedule_json[0], 100)
+        self.assertEqual(scheduled.cost_schedule_json[0], 5000)
 
     def test_activity_update_can_change_one_field_only(self) -> None:
         update = ActivityUpdate(start=4)
@@ -120,7 +120,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
             name="Scheduled Mobilization",
             activity_mode="scheduled_cost",
             distribution_type="manual",
-            cost_schedule_json={"0": 25000, "2": 10000},
+            cost_schedule_json=[25000, 0, 10000],
             start=0,
         )
         expected = {"cashflow": {"id": "cf-1"}}
@@ -139,7 +139,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(result, expected)
         payload = call.await_args.kwargs["payload"]
         self.assertEqual(payload["start"], 0)
-        self.assertEqual(payload["cost_schedule_json"], {"0": 25000.0, "2": 10000.0})
+        self.assertEqual(payload["cost_schedule_json"], [25000.0, 0.0, 10000.0])
         self.assertNotIn("cash_flow_json", payload)
 
     async def test_results_use_qflow_serialized_financing_keys(self) -> None:
