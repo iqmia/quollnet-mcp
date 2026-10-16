@@ -67,15 +67,11 @@ class CashflowPotRegistrationTests(unittest.TestCase):
         names = {tool.name for tool in cashflowpot_mcp._tool_manager._tools.values()}
         self.assertEqual(names, EXPECTED_TOOLS)
 
-    def test_existing_central_mcp_is_not_expanded(self) -> None:
+    def test_central_mcp_does_not_advertise_cashflowpot_tools(self) -> None:
         import app as legacy
 
         names = {tool.name for tool in legacy.mcp._tool_manager._tools.values()}
-        self.assertIn("list_cashflow_projects", names)
-        self.assertIn("create_cashflow", names)
-        self.assertNotIn("get_cashflow_project", names)
-        self.assertNotIn("export_cashflow_excel", names)
-        self.assertNotIn("add_financing_facility", names)
+        self.assertTrue(EXPECTED_TOOLS.isdisjoint(names))
 
     def test_read_and_destructive_annotations_are_set(self) -> None:
         from combined_app import cashflowpot_mcp
