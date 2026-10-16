@@ -120,7 +120,7 @@ Returned calculated values always come from `q_flow`.
 
 ## 6. MCP tool surface
 
-Tool names may receive minor naming adjustments during implementation for consistency, but the capabilities below are required.
+The dedicated `/cashflowpot` MCP exposes the following tool names and capabilities.
 
 ### 6.1 Projects
 
@@ -144,6 +144,7 @@ Project creation follows the current q_flow behavior, including creation of the 
 Read:
 
 - `get_cashflow`
+- `get_cashflow_results`
 
 Mutate:
 
@@ -161,6 +162,8 @@ Portable scenario operations:
 `export_cashflow_json` returns the versioned portable `cashflowpot.cashflow` input model rather than a raw API/database serialization.
 
 `import_cashflow_json` submits that portable model to the authoritative q_flow import path.
+
+`get_cashflow_results` returns a calculation-focused payload containing the authoritative project cashflow series, financing rows, cash position, and summary/KPI values without requiring the client to infer them from source inputs.
 
 ### 6.3 Activities
 
@@ -201,21 +204,17 @@ Mutate:
 - `add_financing_facility`
 - `update_financing_facility`
 - `delete_financing_facility`
-- `reorder_financing_facilities` or equivalent priority update where required
+- `set_financing_facility_order`
 
 Facilities remain embedded source data inside the owning Cashflow's `financing_facilities` JSON array. They do not become independent database entities.
 
-The object-level MCP tools are convenience operations only. q_flow should provide atomic facility mutation helpers/endpoints that update the embedded list, validate the complete facility set, recalculate the cashflow, and return the updated authoritative snapshot.
+The object-level MCP tools are convenience operations only. q_flow provides atomic facility mutation endpoints that update the embedded list, validate the complete facility set, recalculate the cashflow, and return the updated authoritative snapshot.
 
-Facility IDs remain source-level identifiers used to address a facility inside the embedded array. q_flow should ensure a stable ID exists for a newly added facility if one is not supplied.
+Facility IDs remain source-level identifiers used to address a facility inside the embedded array. q_flow ensures a stable ID exists for a newly added facility if one is not supplied.
 
-### 6.5 Results and analysis
+`set_financing_facility_order` updates the saved facility order and the corresponding sweep priority values used by the financing engine.
 
-The main read operations should return the backend-calculated cashflow snapshot including the current authoritative result series and summary metrics. A separate `get_cashflow_results` tool may be added if this materially reduces response size or gives the AI a cleaner analysis payload.
-
-The result surface must include the current project cashflow, financing rows, cash position, and summary/KPI values already produced by q_flow.
-
-### 6.6 Excel export
+### 6.5 Excel export
 
 Required tool:
 
@@ -235,49 +234,92 @@ Cashflow portable scenario
 └── financing_facilities
 ```
 
-Exporting a portable cashflow must therefore preserve all facility source definitions. Importing the scenario on another CashflowPot account/project must recreate the same modeling inputs and let q_flow recalculate all derived outputs.
+Exporting a portable cashflow must preserve all facility source definitions. Importing the scenario on another CashflowPot account/project must recreate the same modeling inputs and let q_flow recalculate all derived outputs.
 
 Calculated facility rows such as draw, repayment, interest, fees, outstanding, and available limit are not portable inputs.
 
 ## 8. q_flow API additions
 
-The MCP should reuse existing q_flow routes wherever they already express the required operation correctly.
+The MCP reuses existing q_flow routes wherever they already express the required operation correctly.
 
-New backend routes/services are expected in two areas.
+New backend routes/services are required in three areas.
 
 ### 8.1 Atomic facility operations
 
 Add q_flow operations for addressing a single facility within `cashflow.financing_facilities` without turning facilities into database rows.
 
-Conceptually:
-
 ```text
 POST   /cashflow/<cashflow_id>/facilities
 PUT    /cashflow/<cashflow_id>/facilities/<facility_id>
 DELETE /cashflow/<cashflow_id>/facilities/<facility_id>
+PUT    /cashflow/<cashflow_id>/facilities/order
 ```
-
-The exact route names may follow q_flow conventions.
 
 Each mutation must:
 
 1. load the active cashflow;
 2. enforce normal CashflowPot authorization;
-3. mutate only the targeted facility definition;
+3. mutate only the targeted facility definition or ordering;
 4. validate the complete facility list using the existing financing validator;
 5. recalculate the cashflow snapshot through the normal calculation engine;
 6. commit atomically; and
 7. return the updated authoritative cashflow snapshot.
 
-### 8.2 Backend Excel export
+### 8.2 Portable JSON export
 
-Add a backend Excel report generator and download endpoint. The backend consumes the authoritative calculated cashflow snapshot and must not reproduce the financial model with alternative formulas.
+Add a q_flow export route so the portable schema is owned by the backend rather than reconstructed independently in the MCP.
+
+```text
+GET /cashflow/<cashflow_id>/export
+```
+
+It returns:
+
+```json
+{
+  "format": "cashflowpot.cashflow",
+  "version": 1,
+  "cashflow": {}
+}
+```
+
+The response contains only portable source inputs defined by the canonical CashflowPot JSON format. It excludes server-owned IDs/ownership metadata and calculated output except for source-level facility IDs used inside the embedded facility list.
+
+### 8.3 Backend Excel export
+
+Add a backend Excel report generator plus a signed-download-link endpoint.
+
+The authenticated creation endpoint is:
+
+```text
+POST /cashflow/<cashflow_id>/excel-export
+```
+
+It returns metadata in this shape:
+
+```json
+{
+  "filename": "<safe-cashflow-name>.xlsx",
+  "download_url": "https://cashflowpot.com/api/exports/cashflow/<signed-token>.xlsx",
+  "expires_at": "<ISO-8601 timestamp>"
+}
+```
+
+The signed download endpoint is:
+
+```text
+GET /exports/cashflow/<signed-token>.xlsx
+```
+
+The backend verifies the signature/expiry, resolves the authorized cashflow encoded by the token, generates the workbook on demand, and returns the XLSX bytes. The signed URL is possession-based and replayable only until expiry; no temporary file persistence is required in the first implementation.
+
+The Excel generator consumes the authoritative calculated cashflow snapshot and must not reproduce the financial model with alternative formulas.
 
 ## 9. Excel parity requirement
 
 The current Flutter Excel exporter is the reference implementation.
 
-The Python backend report must reproduce the current approved workbook as exactly as practicable, because its geometry and print setup were deliberately tuned for good A4 and A3 output/PDF printing.
+The Python backend report must reproduce the current approved workbook as exactly as practicable because its geometry and print setup were deliberately tuned for good A4 and A3 output/PDF printing.
 
 Parity includes, where present in the Flutter exporter:
 
@@ -308,9 +350,9 @@ The backend-calculated flow arrays and KPIs remain authoritative. Spreadsheet fo
 
 Implementation begins with a parity audit of the current Flutter `ExcelExporterV3`/OOXML pipeline.
 
-`XlsxWriter` is the preferred first candidate because it has mature support for formatting, formulas, charts, print areas, page setup, margins, and workbook generation. If exact parity requires workbook XML features not exposed by the chosen library, the backend may apply narrowly scoped OOXML post-processing after generation, mirroring the existing Flutter approach.
+Use `XlsxWriter` as the Python workbook library. It provides the formatting, formulas, charts, print areas, page setup, margins, and workbook generation needed for the report. Where exact parity requires an OOXML detail that XlsxWriter does not expose, apply narrowly scoped OOXML post-processing after workbook generation, mirroring the existing Flutter approach.
 
-The implementation must not introduce multiple competing Python workbook libraries unless a documented missing capability makes that unavoidable.
+Do not introduce a second competing Python workbook library for the same report pipeline.
 
 ## 10. XLSX delivery
 
@@ -318,16 +360,16 @@ Do not put the entire XLSX byte stream into the normal MCP tool response by defa
 
 MCP supports binary resources and resource links, but embedding a workbook as base64 increases payload size and is unnecessarily expensive for normal downloads.
 
-The preferred flow is:
+The flow is:
 
 ```text
 export_cashflow_excel tool
         |
         | authenticated request
         v
-q_flow creates/authorizes an export
+POST q_flow /cashflow/<id>/excel-export
         |
-        | returns short-lived signed HTTPS download URL
+        | filename + short-lived signed HTTPS URL
         v
 MCP returns filename + URL (+ ResourceLink when supported)
         |
@@ -341,19 +383,17 @@ The signed URL must:
 - expire after a short configurable interval;
 - be unguessable/tamper-evident;
 - not expose the QAuth/MCP bearer token in the URL;
-- return the correct XLSX MIME type;
+- return MIME type `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`;
 - set `Content-Disposition: attachment` with a safe filename; and
-- either generate the workbook on demand or serve a temporary artifact with bounded lifetime.
+- generate the workbook on demand in the first implementation.
 
-Prefer stateless signed on-demand generation if performance is acceptable because it avoids persistent temporary-file cleanup. If workbook generation later becomes expensive, the same external contract can switch to a short-lived stored artifact without changing the MCP tool.
-
-For clients that support MCP resources well, the MCP may additionally expose a `ResourceLink` or binary resource path, but the signed HTTPS download remains the compatibility path for a user-visible workbook download.
+For clients that support MCP resources well, the MCP additionally returns a `ResourceLink` when practical, but the signed HTTPS URL remains the compatibility path for a user-visible workbook download.
 
 ## 11. Destructive operations
 
 Because CashflowPot is treated as a single-user application and the user requested the full action surface, the dedicated MCP exposes delete, restore, and hard-delete operations instead of maintaining an MCP-side allowlist.
 
-Destructive tools should use standard MCP destructive annotations/hints where supported so clients can present them appropriately. The server does not create a second confirmation/permission system.
+Destructive tools use standard MCP destructive annotations/hints where supported so clients can present them appropriately. The server does not create a second confirmation/permission system.
 
 q_flow remains authoritative for whether the authenticated user may perform the operation.
 
@@ -373,7 +413,7 @@ Examples:
 - Excel generation failure; and
 - download-link generation failure.
 
-The MCP should not convert backend validation errors into silent defaults.
+The MCP must not convert backend validation errors into silent defaults.
 
 Mutations that q_flow defines as transactional must remain transactional through the MCP.
 
@@ -387,7 +427,7 @@ Add focused tests for:
 - CashflowPot resource audience validation;
 - shared QAuth token exchange;
 - app-token versus unit-token exchange;
-- each tool's request mapping;
+- every tool's request mapping;
 - facility convenience tool mapping;
 - portable JSON import/export;
 - destructive tool annotations where supported;
@@ -400,10 +440,11 @@ Existing `/mcp` tests must continue to pass unchanged.
 
 Add tests for:
 
-- atomic facility add/update/delete;
+- atomic facility add/update/delete/order operations;
 - facility ID creation/preservation;
 - full-list facility validation after mutation;
 - recalculation after facility mutation;
+- backend portable JSON export;
 - portable JSON round-trip remaining complete;
 - Excel workbook generation from an authoritative snapshot;
 - sheet/row/column geometry;
@@ -414,7 +455,7 @@ Add tests for:
 - A4/A3 settings;
 - XLSX MIME type and filename headers;
 - signed-link expiry/tamper rejection; and
-- authorization of export creation/download.
+- authorization of export-link creation.
 
 ### 13.3 Excel parity fixtures
 
@@ -439,7 +480,7 @@ This work must not change the existing `/mcp` tool surface or behavior.
 
 Rollout order:
 
-1. add q_flow facility APIs and backend Excel exporter;
+1. add q_flow portable export, facility APIs, and backend Excel exporter;
 2. verify q_flow independently;
 3. add QAuth CashflowPot MCP resource configuration;
 4. add the dedicated `/cashflowpot` MCP server and full tool surface;
