@@ -26,9 +26,9 @@ async def get_cashflow_results(unit_id: str, cashflow_id: str) -> dict[str, Any]
         return {"data": data}
     keys = (
         "id", "unit_id", "name", "summary", "workflow", "inflow", "outflow",
-        "netflow", "pre_financing_balance", "facility_rows", "facility_draws",
-        "principal_repayments", "facility_interest", "facility_fees",
-        "funded_cash_balance", "unfunded_shortfall", "outflow_with_interest",
+        "netflow", "pre_financing_balance", "facility_rows", "facility_inflow",
+        "facility_outflow", "facility_interest", "facility_fees",
+        "funded_netflow", "unfunded_shortfall", "outflow_with_interest",
     )
     return {key: data[key] for key in keys if key in data}
 
