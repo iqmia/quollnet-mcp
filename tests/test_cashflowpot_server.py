@@ -108,7 +108,7 @@ class CashflowPotMountTests(unittest.TestCase):
 
 
 class CashflowPotExactPathTests(unittest.IsolatedAsyncioTestCase):
-    async def test_exact_cashflowpot_path_does_not_redirect_to_trailing_slash(self) -> None:
+    async def test_exact_cashflowpot_path_is_the_reachable_mcp_endpoint(self) -> None:
         from combined_app import app
 
         transport = httpx.ASGITransport(app=app)
@@ -127,7 +127,10 @@ class CashflowPotExactPathTests(unittest.IsolatedAsyncioTestCase):
                 },
             )
 
-        self.assertNotIn(response.status_code, (301, 302, 307, 308))
+        # An unauthenticated MCP request must reach the protected CashflowPot
+        # resource. A 404 here means the canonical no-trailing-slash URL is not
+        # actually mounted, even if /cashflowpot/ happens to work.
+        self.assertIn(response.status_code, (401, 403))
         self.assertIsNone(response.headers.get("location"))
 
 
