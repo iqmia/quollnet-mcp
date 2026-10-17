@@ -185,3 +185,40 @@ class QledgerClientTests(unittest.IsolatedAsyncioTestCase):
                     )
                 self.assertTrue(caught.exception.outcome_unknown)
                 self.assertIn("same idempotency key", str(caught.exception))
+
+    async def test_operation_validation_keeps_location_message_type_not_input(self):
+        from quollnet_mcp.qledger.qledger_client import QledgerClientError
+
+        def handler(req):
+            return httpx.Response(
+                422,
+                json={
+                    "message": "Invalid operation request.",
+                    "detail": {
+                        "errors": [
+                            {
+                                "loc": ["journal", "lines", 0],
+                                "msg": "Each line must have exactly one positive debit or credit",
+                                "type": "value_error",
+                                "input": {"secret": "DO-NOT-SHOW"},
+                                "ctx": {"secret": "DO-NOT-SHOW"},
+                                "url": "https://DO-NOT-SHOW",
+                            }
+                        ]
+                    },
+                },
+            )
+
+        async with client(handler) as c:
+            with self.assertRaises(QledgerClientError) as caught:
+                await c.request(
+                    "POST",
+                    "/api/units/" + U + "/operations",
+                    access_token="secret-token",
+                    payload={},
+                )
+            message = str(caught.exception)
+            self.assertIn("journal.lines.0", message)
+            self.assertIn("exactly one positive debit or credit", message)
+            self.assertIn("value_error", message)
+            self.assertNotIn("DO-NOT-SHOW", message)

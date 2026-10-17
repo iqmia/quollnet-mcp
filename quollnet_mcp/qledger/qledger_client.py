@@ -119,6 +119,31 @@ class QledgerClient:
                                         errors.append(
                                             field + ": " + _safe_message(item, token)
                                         )
+                    operation_errors = detail.get("errors")
+                    if isinstance(operation_errors, list):
+                        for item in operation_errors[:10]:
+                            if not isinstance(item, dict):
+                                continue
+                            loc = item.get("loc")
+                            if not isinstance(loc, list) or not all(
+                                isinstance(v, (str, int)) for v in loc
+                            ):
+                                continue
+                            field = ".".join(str(v) for v in loc)
+                            if not re.fullmatch(r"[A-Za-z0-9_.\[\]-]{1,100}", field):
+                                continue
+                            if re.search(
+                                r"token|password|secret|authorization", field, re.I
+                            ):
+                                continue
+                            if isinstance(item.get("msg"), str):
+                                text = field + ": " + _safe_message(item["msg"], token)
+                                kind = item.get("type")
+                                if isinstance(kind, str) and re.fullmatch(
+                                    r"[a-z0-9_.-]{1,80}", kind
+                                ):
+                                    text += " (" + kind + ")"
+                                errors.append(text)
                     if errors:
                         message += " — " + "; ".join(errors)[:2000]
         except ValueError:

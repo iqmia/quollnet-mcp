@@ -1,4 +1,5 @@
 import json
+import re
 from uuid import UUID
 from mcp.types import CallToolResult, EmbeddedResource, TextContent
 from mcp.server.mcpserver.exceptions import ToolError
@@ -60,6 +61,15 @@ async def download_qledger_attachment(
 ) -> CallToolResult:
     metadata = await get_qledger_attachment(unit_id, attachment_id)
     resource = await attachment_resource(unit_id, attachment_id)
+    # QLedger deliberately downloads with octet-stream; its stored metadata
+    # identifies the original file type for clients that render binary resources.
+    mime = metadata.get("content_type")
+    resource.mime_type = (
+        mime
+        if isinstance(mime, str)
+        and re.fullmatch(r"[A-Za-z0-9!#$&^_.+\-]+/[A-Za-z0-9!#$&^_.+\-]+", mime)
+        else "application/octet-stream"
+    )
     safe_metadata = {
         k: metadata[k]
         for k in ("id", "original_filename", "content_type", "size_bytes", "sha256")

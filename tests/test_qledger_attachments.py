@@ -17,13 +17,16 @@ class QledgerAttachmentTests(unittest.IsolatedAsyncioTestCase):
             seen.append(req)
             if req.url.path.endswith("/download"):
                 return httpx.Response(
-                    200, content=b"pdf", headers={"content-type": "application/pdf"}
+                    200,
+                    content=b"pdf",
+                    headers={"content-type": "application/octet-stream"},
                 )
             return httpx.Response(
                 200,
                 json={
                     "id": A,
                     "original_filename": "invoice.pdf",
+                    "content_type": "application/pdf",
                     "size_bytes": 3,
                     "sha256": "c35b21d6ca39aa7cc3b79a705d989f1a6e88b99ab43988d74048799e3db926a3",
                 },
@@ -87,5 +90,8 @@ class QledgerAttachmentTests(unittest.IsolatedAsyncioTestCase):
                     )
                 result = await t.download_qledger_attachment(U, A)
                 self.assertEqual(result.content[1].resource.blob, "cGRm")
+                self.assertEqual(
+                    result.content[1].resource.mime_type, "application/pdf"
+                )
                 self.assertNotIn("cGRm", result.content[0].text)
                 self.assertNotIn("unit", result.content[0].text.replace(U, ""))
