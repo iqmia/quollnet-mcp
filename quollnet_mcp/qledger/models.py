@@ -113,3 +113,9 @@ class MemberInvite(Schema):
 
 class MemberRoles(Schema):
     roles: list[RoleName] = Field(min_length=1)
+
+
+class AttachmentQuery(PageQuery):
+    linked_to_object: str = Field(min_length=1, max_length=100)
+    linked_to_object_id: str = Field(min_length=1, max_length=255)
+    linked_to_app: str = Field(default="", max_length=128)
