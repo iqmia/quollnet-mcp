@@ -12,7 +12,7 @@
 
 **Tool inventory:** `docs/superpowers/specs/2026-10-17-qledger-mcp-tool-map.md`
 
-**Status:** Draft prepared at the user's request alongside the design. Implementation is not started. Reconcile against the finished CashflowPot/shared-core commit and have the written design/plan reviewed before execution. Do not execute against the old core merely because paths are listed below.
+**Status:** Approved in conversation on 17 October 2026. Executed natively after integrating main commit c16a50d0961a37767960ecdae9249fa998895962. The final core retained the existing shared modules rather than moving them to core/. Live deployment/client acceptance remains separate.
 
 ## Global Constraints
 
@@ -42,7 +42,7 @@
 
 - [ ] Confirm the other process has finished and identify its final shared-core commit. Preserve its work; do not reset or force-push its branch.
 - [ ] Inspect branch state, `AGENTS.md`, final `core/` exports, configuration, server factory, ASGI mount/metadata routing and lifecycle. Incorporate that commit into `feature/qledger-mcp` by normal history-preserving integration.
-- [ ] Reconcile the shared paths in this plan (`core/config.py`, `combined_app.py`, existing central token exchange). These are dependency integration points, not permission to implement competing versions. If names differ, update this document and its references before code changes.
+- [ ] Reconcile the shared paths in this plan (`quollnet_mcp/config.py`, `combined_app.py`, existing central token exchange). These are dependency integration points, not permission to implement competing versions. If names differ, update this document and its references before code changes.
 - [ ] Review the proposed file transfer with the intended MCP client: prove an existing base64-style upload can carry a real small invoice and the installed SDK/client supports authenticated binary-resource delivery. If it cannot, amend the design before implementing a different delivery mechanism.
 - [ ] Read both spec documents; resolve any API drift from QLedger commit `92fc071e04583369e8d7746a91f3e16a59470c81`. Record the deployment URL/configuration separately; never guess it from the product name.
 - [ ] Run the integrated baseline: `python -m unittest discover -s tests -v`. Record its result before adding QLedger. Use the repo's existing environment/setup procedure; no runtime dependency is needed for this documentation branch.

@@ -16,7 +16,12 @@ from starlette.routing import Mount, Route
 
 import app as legacy
 from quollnet_mcp.cashflowpot.server import build_cashflowpot_server
-from quollnet_mcp.dependencies import qapp_client, qauth_client, qflow_client
+from quollnet_mcp.dependencies import (
+    qapp_client,
+    qauth_client,
+    qflow_client,
+    qledger_client,
+)
 
 
 settings = legacy.settings
@@ -44,14 +49,18 @@ class CanonicalCashflowPotPathMiddleware:
     its expected inner ``/`` path.
     """
 
-    def __init__(self, application) -> None:
+    def __init__(self, application, resource_paths=("/cashflowpot",)) -> None:
         self.application = application
+        self.resource_paths = resource_paths
 
     async def __call__(self, scope, receive, send) -> None:
-        if scope.get("type") in {"http", "websocket"} and scope.get("path") == "/cashflowpot":
+        if (
+            scope.get("type") in {"http", "websocket"}
+            and scope.get("path") in self.resource_paths
+        ):
             scope = dict(scope)
-            scope["path"] = "/cashflowpot/"
-            scope["raw_path"] = b"/cashflowpot/"
+            scope["path"] = scope["path"] + "/"
+            scope["raw_path"] = scope["path"].encode("ascii")
         await self.application(scope, receive, send)
 
 
@@ -75,28 +84,79 @@ async def cashflowpot_protected_resource_metadata(_: Request) -> JSONResponse:
     )
 
 
-@asynccontextmanager
-async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
-    async with AsyncExitStack() as stack:
-        await stack.enter_async_context(qapp_client)
-        await stack.enter_async_context(qauth_client)
-        await stack.enter_async_context(qflow_client)
-        await stack.enter_async_context(legacy.mcp.session_manager.run())
-        await stack.enter_async_context(cashflowpot_mcp.session_manager.run())
-        yield
-
-
-app = Starlette(
-    routes=[
+def build_combined_app(configuration):
+    """Assemble optional QLedger alongside the unchanged existing MCP surfaces."""
+    qledger_mcp = None
+    routes = [
         Route("/health", legacy.health, methods=["GET"]),
         Route(
             "/.well-known/oauth-protected-resource/cashflowpot",
             cashflowpot_protected_resource_metadata,
             methods=["GET"],
         ),
+    ]
+    paths = ["/cashflowpot"]
+    if configuration.qledger_enabled:
+        from quollnet_mcp.qledger.server import build_qledger_server
+
+        qledger_mcp = build_qledger_server(configuration)
+        qledger_http_app = qledger_mcp.streamable_http_app(
+            streamable_http_path="/",
+            json_response=True,
+            stateless_http=True,
+            transport_security=TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=["mcp.quollnet.com", "mcp.quollnet.com:*"],
+                allowed_origins=["https://chatgpt.com"],
+            ),
+        )
+
+        async def qledger_metadata(_: Request) -> JSONResponse:
+            return JSONResponse(
+                {
+                    "resource": configuration.qledger_mcp_resource_uri,
+                    "authorization_servers": [configuration.qauth_issuer_url],
+                    "scopes_supported": ["mcp:connect"],
+                    "bearer_methods_supported": ["header"],
+                },
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
+
+        routes += [
+            Route(
+                "/.well-known/oauth-protected-resource/qledger",
+                qledger_metadata,
+                methods=["GET"],
+            ),
+            Mount("/qledger", app=qledger_http_app),
+        ]
+        paths.append("/qledger")
+    routes += [
         Mount("/cashflowpot", app=_cashflowpot_http_app),
         Mount("/", app=legacy.mcp_http_app),
-    ],
-    lifespan=lifespan,
-)
-app.add_middleware(CanonicalCashflowPotPathMiddleware)
+    ]
+
+    @asynccontextmanager
+    async def lifespan(_: Starlette) -> AsyncGenerator[None, None]:
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(qapp_client)
+            await stack.enter_async_context(qauth_client)
+            await stack.enter_async_context(qflow_client)
+            if qledger_mcp is not None:
+                await stack.enter_async_context(qledger_client)
+            await stack.enter_async_context(legacy.mcp.session_manager.run())
+            await stack.enter_async_context(cashflowpot_mcp.session_manager.run())
+            if qledger_mcp is not None:
+                await stack.enter_async_context(qledger_mcp.session_manager.run())
+            yield
+
+    application = Starlette(routes=routes, lifespan=lifespan)
+    application.state.qledger_mcp = qledger_mcp
+    application.add_middleware(
+        CanonicalCashflowPotPathMiddleware, resource_paths=tuple(paths)
+    )
+    return application
+
+
+app = build_combined_app(settings)
+qledger_mcp = app.state.qledger_mcp

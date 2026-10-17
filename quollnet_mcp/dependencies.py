@@ -9,4 +9,5 @@ qflow_client = QFlowClient()
 
 # Constructing a disabled client performs no network activity and requires no URL.
 from quollnet_mcp.qledger.qledger_client import QledgerClient
+
 qledger_client = QledgerClient(qauth_client.settings)

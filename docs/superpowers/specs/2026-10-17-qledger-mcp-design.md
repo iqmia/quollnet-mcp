@@ -1,7 +1,7 @@
 # QLedger MCP design
 
 Date: 17 October 2026 (Asia/Beirut)
-Status: Draft for review. Documentation only; implementation waits for the CashflowPot/shared-core work.
+Status: Approved in conversation on 17 October 2026; implemented on feature/qledger-mcp. Deployment and real client file rendering remain to verify.
 
 ## Purpose and agreed scope
 
@@ -9,7 +9,7 @@ Add `https://mcp.quollnet.com/qledger` to `iqmia/quollnet-mcp`. An AI client act
 
 Examples include inviting a unit member, registering an invoice as a draft transaction with its original attachment and optional structured record, posting approved entries, and retrieving invoices or receipts linked to a transaction. Success means these workflows use the same authorization and business rules as any other QLedger caller.
 
-This branch contains only this design, its tool mapping, and a draft implementation plan. It does not modify application code, QAuth settings, deployments, database schemas, or the other process's branch. The core/CashflowPot work must be committed and integrated before implementation starts. The written design and plan are review artifacts, not approval to deploy.
+The initial planning commit contained only this design, its tool mapping, and an implementation plan. Implementation was authorized after the CashflowPot work finished. It adds QLedger adapter code; QAuth settings, deployments, database schemas and the other process's branch are not changed. The written design and plan are review artifacts, not approval to deploy.
 
 ## Source baseline and integration dependency
 
@@ -145,3 +145,13 @@ Rollout order: finish/integrate shared core; approve/reconcile this design and p
 - QAuth `design-docs/mcp-authentication-implementation.md` and `q_auth/common_roles.json` on `iqmia/q_auth/master` (reviewed 17 October 2026).
 - MCP OAuth discovery/audience requirements: https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization (reviewed 17 October 2026; follow the repo SDK's negotiated protocol revision).
 - MCP binary resource and embedded-result types: https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2025-06-18/schema.mdx . Rendering is client-dependent; this design does not require an SDK/protocol upgrade.
+
+## Implementation integration notes
+
+The finished CashflowPot work was merged from main commit `c16a50d0961a37767960ecdae9249fa998895962` into this feature branch. It retained `quollnet_mcp/config.py`, `auth.py`, `services/qauth_client.py` and `dependencies.py`; these existing shared interfaces are reused. No parallel core directory was introduced.
+
+QLedger is optional (`QLEDGER_ENABLED=false` by default). The combined ASGI factory mounts it before the legacy catch-all when enabled, normalizes its exact no-slash path internally and exposes its RFC resource-metadata route at the host root.
+
+The installed SDK's resource-template callbacks consume bytes. Resource reads therefore advertise `application/octet-stream`; `download_qledger_attachment` returns the specific upstream MIME type as an embedded binary resource plus filename/hash metadata. Neither path caches authorized file bytes or requires public download URLs. Transfers have a hard per-file schema ceiling of 10 MiB; the deployment can configure a lower limit.
+
+Automated tests cover actual ASGI/MCP transport, signed MCP tokens, per-request QAuth exchange, two concurrent users/units and binary resource reads using controlled upstream HTTP transports. These tests do not establish live QLedger deployment or ChatGPT file-rendering support. The live acceptance workflows remain deployment checks.

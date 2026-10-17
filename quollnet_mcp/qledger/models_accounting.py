@@ -64,8 +64,12 @@ class PostRequest(VersionRequest):
 
     @model_validator(mode="after")
     def override(self):
-        if self.override_lock != bool(self.override_reason and self.override_reason.strip()):
-            raise ValueError("A lock override requires explicit override_lock and a reason")
+        if self.override_lock != bool(
+            self.override_reason and self.override_reason.strip()
+        ):
+            raise ValueError(
+                "A lock override requires explicit override_lock and a reason"
+            )
         return self
 
 

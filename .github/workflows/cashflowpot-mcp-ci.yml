@@ -1,9 +1,10 @@
-name: Dedicated CashflowPot MCP CI
+name: Quollnet MCP CI
 
 on:
   push:
     branches:
       - feature/dedicated-cashflowpot-mcp
+      - feature/qledger-mcp
   workflow_dispatch:
 
 jobs:

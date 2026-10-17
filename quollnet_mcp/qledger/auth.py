@@ -1,4 +1,5 @@
 """Exchange the current request identity; never cache a user's tokens."""
+
 from uuid import UUID
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver.exceptions import ToolError
@@ -20,7 +21,9 @@ async def _token(unit_id: str | None = None) -> str:
             unit_id=unit_id,
         )
     except QAuthClientError:
-        raise ToolError("QAuth token exchange failed. Reconnect or check QLedger application/unit access.") from None
+        raise ToolError(
+            "QAuth token exchange failed. Reconnect or check QLedger application/unit access."
+        ) from None
 
 
 async def application_token() -> str:

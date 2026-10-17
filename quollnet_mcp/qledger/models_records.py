@@ -68,7 +68,9 @@ class OperationLink(Schema):
 
 class OperationRequest(Schema):
     records: list[OperationRecord] = Field(default_factory=list, max_length=1000)
-    attachments: list[OperationAttachment] = Field(default_factory=list, max_length=1000)
+    attachments: list[OperationAttachment] = Field(
+        default_factory=list, max_length=1000
+    )
     journal: JournalCreate | None = None
     links: list[OperationLink] = Field(default_factory=list, max_length=2000)
     post_journal: bool = False
@@ -77,8 +79,14 @@ class OperationRequest(Schema):
     @model_validator(mode="after")
     def aliases(self):
         keys = [obj.key for obj in [*self.records, *self.attachments]]
-        if "journal" in keys or any(k.startswith("journal:") for k in keys) or len(keys) != len(set(keys)):
-            raise ValueError("Local keys must be unique; journal and journal:line aliases are reserved")
+        if (
+            "journal" in keys
+            or any(k.startswith("journal:") for k in keys)
+            or len(keys) != len(set(keys))
+        ):
+            raise ValueError(
+                "Local keys must be unique; journal and journal:line aliases are reserved"
+            )
         fields = [a.file_field for a in self.attachments]
         if "payload" in fields or len(fields) != len(set(fields)):
             raise ValueError("Each attachment needs a unique non-payload file part")

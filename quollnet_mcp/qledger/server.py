@@ -1,0 +1,205 @@
+"""Dedicated QLedger surface; shares OAuth infrastructure, never accounting authority."""
+
+import base64
+from mcp.server import MCPServer
+from mcp.server.auth.settings import AuthSettings
+from mcp.types import ToolAnnotations
+from quollnet_mcp.auth import QAuthTokenVerifier
+from quollnet_mcp.config import Settings
+from quollnet_mcp.qledger.files import attachment_resource
+from quollnet_mcp.qledger.instructions import QLEDGER_INSTRUCTIONS
+from quollnet_mcp.qledger.tools import (
+    units,
+    accounts,
+    settings as ledger_settings,
+    journals,
+    reports,
+    records,
+    attachments,
+    operations,
+)
+
+
+_GROUPS = (
+    (
+        units,
+        (
+            "list_qledger_units",
+            "create_qledger_unit",
+            "load_qledger_unit",
+            "list_qledger_members",
+            "invite_qledger_member",
+            "remove_qledger_member",
+            "list_qledger_roles",
+            "add_qledger_member_roles",
+            "remove_qledger_member_role",
+        ),
+    ),
+    (
+        accounts,
+        (
+            "list_qledger_accounts",
+            "get_qledger_account",
+            "create_qledger_account",
+            "update_qledger_account",
+        ),
+    ),
+    (
+        ledger_settings,
+        (
+            "get_qledger_settings",
+            "initialize_qledger_settings",
+            "update_qledger_settings",
+        ),
+    ),
+    (
+        journals,
+        (
+            "list_qledger_transactions",
+            "get_qledger_transaction",
+            "create_qledger_transaction",
+            "update_qledger_transaction",
+            "post_qledger_transaction",
+            "reverse_qledger_transaction",
+            "delete_qledger_transaction",
+        ),
+    ),
+    (
+        reports,
+        (
+            "get_qledger_ledger",
+            "get_qledger_account_statement",
+            "get_qledger_partner_statement",
+            "get_qledger_trial_balance",
+        ),
+    ),
+    (
+        records,
+        (
+            "list_qledger_records",
+            "get_qledger_record",
+            "create_qledger_record",
+            "update_qledger_record",
+            "delete_qledger_record",
+            "copy_qledger_record",
+            "post_qledger_record",
+            "list_qledger_record_links",
+            "link_qledger_record",
+            "unlink_qledger_record",
+            "replace_qledger_record_link",
+        ),
+    ),
+    (
+        attachments,
+        (
+            "list_qledger_attachments",
+            "get_qledger_attachment",
+            "upload_qledger_attachment",
+            "download_qledger_attachment",
+            "list_qledger_attachment_links",
+            "link_qledger_attachment",
+            "unlink_qledger_attachment",
+            "replace_qledger_attachment_link",
+        ),
+    ),
+    (operations, ("execute_qledger_operation",)),
+)
+_KEYED = {
+    "create_qledger_transaction",
+    "reverse_qledger_transaction",
+    "create_qledger_record",
+    "copy_qledger_record",
+    "link_qledger_record",
+    "upload_qledger_attachment",
+    "link_qledger_attachment",
+    "execute_qledger_operation",
+}
+_DESCRIPTIONS = {
+    "load_qledger_unit": "Load a unit and its hierarchy. Tokens remain internal; use the returned unit ID explicitly on subsequent tools.",
+    "invite_qledger_member": "Invite a member with explicit role names. send_email=true may send an invitation. Requires invite:member.",
+    "add_qledger_member_roles": "Add the supplied roles to a member; this does not replace all existing roles. Requires edit:member.",
+    "post_qledger_transaction": "Permanently post the exact reviewed journal version and evidence. A 409 requires renewed review; never substitute fresh versions automatically.",
+    "reverse_qledger_transaction": "Prepare a NEW draft reversal using the supplied date and description. Posting is a separate authorized operation.",
+    "post_qledger_record": "Permanently post the reviewed record version and exact reviewed_attachments hashes.",
+    "link_qledger_record": "Link a record to a parent. Linking to a posted accounting parent may post the record; include its reviewed version and file hashes.",
+    "replace_qledger_record_link": "Atomically replace one record-parent link. Posted-parent protections and recursive orphan rules are enforced by QLedger.",
+    "unlink_qledger_record": "Remove one parent link; affected unposted parentless children may be deleted recursively by QLedger.",
+    "unlink_qledger_attachment": "Remove one parent link; an attachment with no remaining parent may be deleted by QLedger.",
+    "download_qledger_attachment": "Retrieve original bytes as an authenticated binary MCP resource plus file metadata. Default maximum 10 MiB; rendering depends on the client.",
+    "upload_qledger_attachment": "Upload actual original file bytes as strict raw base64, with an initial parent. No image conversion; default limit 10 MiB.",
+    "execute_qledger_operation": "Atomically register records, a NEW journal, files and explicit links, with optional explicitly authorized posting. Existing records that may post need reviewed versions/hashes. Never split the request into separate creates.",
+    "list_qledger_records": "Find authorized records with parent type/ID, namespace and comma-separated types such as invoice,receipt. Entry filtering does not include line-parent links.",
+    "delete_qledger_record": "Delete an eligible unposted parentless record with its current version; QLedger recursively cleans eligible children.",
+    "copy_qledger_record": "Copy the specified reviewed source version into a new unlinked draft; requires source view and record:add.",
+}
+
+
+def build_qledger_server(settings: Settings) -> MCPServer:
+    server = MCPServer(
+        "qledger-mcp",
+        version=settings.service_version,
+        instructions=QLEDGER_INSTRUCTIONS,
+        token_verifier=QAuthTokenVerifier(
+            issuer_url=settings.qauth_issuer_url,
+            resource_uri=settings.qledger_mcp_resource_uri,
+            app_id=settings.qauth_app_id,
+            public_key=settings.qauth_public_key,
+        ),
+        auth=AuthSettings(
+            issuer_url=settings.qauth_issuer_url,
+            resource_server_url=settings.qledger_mcp_resource_uri,
+            required_scopes=["mcp:connect"],
+        ),
+    )
+    for module, names in _GROUPS:
+        for name in names:
+            title = (
+                name.replace("_", " ")
+                .replace("qledger", "QLedger")
+                .capitalize()
+                .replace("qledger", "QLedger")
+            )
+            read_only = (
+                name.startswith(("list_", "get_", "download_"))
+                or name == "load_qledger_unit"
+            )
+            destructive = not read_only and not name.startswith(
+                ("create_", "copy_", "upload_", "initialize_")
+            )
+            description = _DESCRIPTIONS.get(
+                name,
+                title
+                + ". QLedger enforces the connected user's actual permissions and validation.",
+            )
+            if name in _KEYED:
+                description += " Requires a stable idempotency_key; retry unchanged intent with the same key, payload and file bytes."
+            server.tool(
+                name=name,
+                title=title,
+                description=description,
+                annotations=ToolAnnotations(
+                    read_only_hint=read_only,
+                    destructive_hint=destructive,
+                    idempotent_hint=read_only or name in _KEYED,
+                    open_world_hint=False,
+                ),
+                meta={
+                    "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
+                    "openai/toolInvocation/invoking": title,
+                    "openai/toolInvocation/invoked": title + " complete",
+                },
+            )(getattr(module, name))
+
+    @server.resource(
+        "qledger://units/{unit_id}/attachments/{attachment_id}",
+        name="qledger_attachment",
+        description="Original file bytes, authorized against the current user and parent paths on every read.",
+        mime_type="application/octet-stream",
+    )
+    async def read_attachment(unit_id: str, attachment_id: str) -> bytes:
+        # SDK resource callbacks consume bytes, not BlobResourceContents. The
+        # download tool provides the specific MIME type and filename metadata.
+        resource = await attachment_resource(unit_id, attachment_id)
+        return base64.b64decode(resource.blob, validate=True)
+
+    return server

@@ -1,11 +1,20 @@
 """Transport types; QLedger remains authoritative for business validation."""
+
 import json
 from datetime import date
 from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictStr, TypeAdapter, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictStr,
+    TypeAdapter,
+    model_validator,
+)
 
 
 class Schema(BaseModel):
@@ -13,12 +22,20 @@ class Schema(BaseModel):
 
 
 def _money(value: str) -> str:
-    TypeAdapter(Annotated[Decimal, Field(ge=0, max_digits=20, decimal_places=6, allow_inf_nan=False)]).validate_python(value)
+    TypeAdapter(
+        Annotated[
+            Decimal, Field(ge=0, max_digits=20, decimal_places=6, allow_inf_nan=False)
+        ]
+    ).validate_python(value)
     return value
 
 
 def _rate(value: str) -> str:
-    TypeAdapter(Annotated[Decimal, Field(gt=0, max_digits=20, decimal_places=10, allow_inf_nan=False)]).validate_python(value)
+    TypeAdapter(
+        Annotated[
+            Decimal, Field(gt=0, max_digits=20, decimal_places=10, allow_inf_nan=False)
+        ]
+    ).validate_python(value)
     return value
 
 
@@ -93,7 +110,10 @@ class EvidenceManifest(Schema):
 
 class FileInput(Schema):
     filename: str = Field(min_length=1, max_length=255)
-    content_type: str = Field(default="application/octet-stream", pattern=r"^[A-Za-z0-9!#$&^_.+\-]+/[A-Za-z0-9!#$&^_.+\-]+$")
+    content_type: str = Field(
+        default="application/octet-stream",
+        pattern=r"^[A-Za-z0-9!#$&^_.+\-]+/[A-Za-z0-9!#$&^_.+\-]+$",
+    )
     file_base64: str = Field(min_length=1, max_length=13981016, repr=False)
 
 
