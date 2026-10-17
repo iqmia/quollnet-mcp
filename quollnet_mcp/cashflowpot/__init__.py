@@ -1,0 +1,1 @@
+"""Dedicated CashflowPot MCP resource."""

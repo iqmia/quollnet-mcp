@@ -150,6 +150,80 @@ async def restore_article(
         raise ToolError(str(error)) from error
 
 
+async def list_articles_needing_translation() -> dict[str, Any]:
+    """List missing or stale translations visible to the connected user.
+
+    The qApp response includes both work that is eligible for automatic
+    translation and work whose source family is locked from the cron translator.
+    """
+    access_token = await qapp_user_token()
+    try:
+        return await qapp_client.get_json(
+            "/articles/api/v1/articles/translations/pending",
+            access_token=access_token,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
+async def increment_article_version(
+    article_id: Annotated[str, _ARTICLE_ID],
+) -> dict[str, Any]:
+    """Increment an origin article's translation-impact version by exactly one.
+
+    Use only after a source change is significant enough that existing
+    translations should be reviewed or retranslated. Do not call this after
+    every ordinary edit.
+    """
+    return await _post_translation_lifecycle_action(article_id, "increment-version")
+
+
+async def lock_article_auto_translation(
+    article_id: Annotated[str, _ARTICLE_ID],
+) -> dict[str, Any]:
+    """Lock an origin article family from automatic cron translation.
+
+    Pending translations remain visible; this only prevents automatic selection.
+    """
+    return await _post_translation_lifecycle_action(article_id, "lock-auto-translation")
+
+
+async def unlock_article_auto_translation(
+    article_id: Annotated[str, _ARTICLE_ID],
+) -> dict[str, Any]:
+    """Allow automatic cron translation for an origin article family again.
+
+    Unlocking does not mark any existing translation current.
+    """
+    return await _post_translation_lifecycle_action(article_id, "unlock-auto-translation")
+
+
+async def mark_article_translation_current(
+    article_id: Annotated[str, _ARTICLE_ID],
+) -> dict[str, Any]:
+    """Mark one translation current against its source's present version.
+
+    Call only after that translation has actually been updated or reviewed
+    against the current source article.
+    """
+    return await _post_translation_lifecycle_action(article_id, "mark-translation-current")
+
+
+async def _post_translation_lifecycle_action(
+    article_id: str,
+    action: str,
+) -> dict[str, Any]:
+    access_token = await qapp_user_token()
+    try:
+        return await qapp_client.post_json(
+            f"/articles/api/v1/articles/{_encoded_article_id(article_id)}/{action}",
+            payload={},
+            access_token=access_token,
+        )
+    except QAppClientError as error:
+        raise ToolError(str(error)) from error
+
+
 def register_article_lifecycle_tools(mcp: MCPServer) -> None:
     """Register QArticles health, reference, and lifecycle tools."""
     security = [{"type": "oauth2", "scopes": ["mcp:connect"]}]
@@ -286,3 +360,101 @@ def register_article_lifecycle_tools(mcp: MCPServer) -> None:
             "openai/toolInvocation/invoked": "Article restored",
         },
     )(restore_article)
+
+    mcp.tool(
+        name="list_articles_needing_translation",
+        title="List articles needing translation",
+        description=(
+            "List missing or stale QArticle translations visible to the connected "
+            "user. Includes both auto-eligible work and pending work whose source "
+            "family is locked from automatic translation."
+        ),
+        annotations=ToolAnnotations(
+            read_only_hint=True,
+            destructive_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "securitySchemes": security,
+            "openai/toolInvocation/invoking": "Checking pending translations",
+            "openai/toolInvocation/invoked": "Pending translations retrieved",
+        },
+    )(list_articles_needing_translation)
+
+    mcp.tool(
+        name="increment_article_version",
+        title="Increment article translation version",
+        description=(
+            "Increment an origin article's translation-impact version by exactly one. "
+            "Use only after a significant source change that requires existing "
+            "translations to be reviewed or retranslated; never call after every edit."
+        ),
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "securitySchemes": security,
+            "openai/toolInvocation/invoking": "Incrementing article version",
+            "openai/toolInvocation/invoked": "Article version incremented",
+        },
+    )(increment_article_version)
+
+    mcp.tool(
+        name="lock_article_auto_translation",
+        title="Lock article automatic translation",
+        description=(
+            "Reserve the whole origin article family from automatic cron translation. "
+            "Pending translation work remains visible and may still be handled manually."
+        ),
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "securitySchemes": security,
+            "openai/toolInvocation/invoking": "Locking automatic translation",
+            "openai/toolInvocation/invoked": "Automatic translation locked",
+        },
+    )(lock_article_auto_translation)
+
+    mcp.tool(
+        name="unlock_article_auto_translation",
+        title="Unlock article automatic translation",
+        description=(
+            "Allow the cron translator to process pending work for the source family "
+            "again. Unlocking does not mark any translation current."
+        ),
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "securitySchemes": security,
+            "openai/toolInvocation/invoking": "Unlocking automatic translation",
+            "openai/toolInvocation/invoked": "Automatic translation unlocked",
+        },
+    )(unlock_article_auto_translation)
+
+    mcp.tool(
+        name="mark_article_translation_current",
+        title="Mark article translation current",
+        description=(
+            "Mark one translation current against the source's present version. "
+            "Use only after that translation has actually been reviewed or updated "
+            "against the current source article."
+        ),
+        annotations=ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            open_world_hint=False,
+        ),
+        meta={
+            "securitySchemes": security,
+            "openai/toolInvocation/invoking": "Marking translation current",
+            "openai/toolInvocation/invoked": "Translation marked current",
+        },
+    )(mark_article_translation_current)
