@@ -46,7 +46,7 @@ class CashflowActivityInput(BaseModel):
             ),
         ),
     ] = 0.10
-    mobilization_period: Annotated[int, Field(ge=0)] = 1
+    mobilization_period: Annotated[int, Field(ge=0, description="Pre-work/no-work delay after activity start, in model periods. Defaults to zero; set a positive value only if requested.")] = 0
     subcontracted: Annotated[float, Field(ge=0, le=1)] = 0.70
     skew: Annotated[
         float | None,
