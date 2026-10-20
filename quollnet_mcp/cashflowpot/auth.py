@@ -11,8 +11,9 @@ async def cashflowpot_token(unit_id: str | None = None) -> str:
 
     The first call exchanges the OAuth identity for a CashflowPot *user* token.
     q_flow subsequently handles Unit loading and token refresh, returning new
-    tokens with API responses; the MCP stores those automatically. unit_id is
-    retained for tool compatibility, not used in the initial exchange.
+    tokens with API responses; the MCP stores those automatically. unit_id
+    determines whether to send the latest Unit token or the saved general app
+    token, but is not used in the initial exchange.
     """
     access_token = get_access_token()
     if access_token is None or not access_token.subject or not access_token.token:
@@ -24,6 +25,7 @@ async def cashflowpot_token(unit_id: str | None = None) -> str:
             subject=access_token.subject,
             app_id=qauth_client.settings.cashflowpot_app_id,
             oauth_expires_at=access_token.expires_at,
+            prefer_app_token=unit_id is None,
             exchange=lambda: qauth_client.exchange_app_token(
                 mcp_access_token=access_token.token,
                 target_app_id=qauth_client.settings.cashflowpot_app_id,
