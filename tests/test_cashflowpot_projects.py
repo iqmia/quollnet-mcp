@@ -36,7 +36,7 @@ class CashflowPotProjectTokenScopeTests(unittest.IsolatedAsyncioTestCase):
         ):
             await delete_cashflow_project("unit-1")
             await restore_cashflow_project("unit-1")
-            await hard_delete_cashflow_project("unit-1")
+            await hard_delete_cashflow_project("unit-1", confirm_permanent=True)
 
         self.assertEqual(
             token.await_args_list,

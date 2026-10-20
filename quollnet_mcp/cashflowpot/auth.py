@@ -18,4 +18,6 @@ async def cashflowpot_token(unit_id: str | None = None) -> str:
             unit_id=unit_id,
         )
     except QAuthClientError as error:
-        raise ToolError(str(error)) from error
+        raise ToolError(
+            "CashflowPot authorization failed. Reconnect or check your project access."
+        ) from error

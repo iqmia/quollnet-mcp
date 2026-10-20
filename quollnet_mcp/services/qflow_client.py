@@ -65,19 +65,20 @@ class QFlowClient:
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as error:
-            detail = None
-            try:
-                body = error.response.json()
-                if isinstance(body, Mapping):
-                    candidate = body.get("message") or body.get("error")
-                    if isinstance(candidate, str) and candidate.strip():
-                        detail = candidate.strip()
-            except ValueError:
-                pass
-            message = f"q_flow returned HTTP {error.response.status_code}"
-            if detail:
-                message = f"{message}: {detail}"
-            raise QFlowClientError(message) from error
+            # Upstream messages can contain SQL errors, credentials or user
+            # identifiers. Do not copy arbitrary response bodies into tool errors.
+            status = error.response.status_code
+            details = {
+                400: "Invalid CashflowPot input; check the supplied properties and schedules.",
+                401: "Authentication expired or is invalid; reconnect CashflowPot.",
+                403: "Access denied for this project or operation.",
+                404: "The requested CashflowPot item was not found or is unavailable.",
+                409: "The requested change conflicts with the current item state.",
+                422: "Invalid CashflowPot input; check the supplied properties and schedules.",
+                429: "CashflowPot is temporarily rate limited; retry later.",
+            }
+            message = details.get(status, "CashflowPot could not complete the request; retry later.")
+            raise QFlowClientError(f"CashflowPot returned HTTP {status}: {message}") from error
         except httpx.RequestError as error:
             raise QFlowClientError("q_flow request failed") from error
         except ValueError as error:

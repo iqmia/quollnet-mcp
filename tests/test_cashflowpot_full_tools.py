@@ -81,7 +81,7 @@ class CashflowPotRegistrationTests(unittest.TestCase):
         self.assertTrue(tools["export_cashflow_excel"].annotations.read_only_hint)
         self.assertTrue(tools["delete_activity"].annotations.destructive_hint)
         self.assertTrue(tools["hard_delete_cashflow_project"].annotations.destructive_hint)
-        self.assertFalse(tools["update_cashflow"].annotations.destructive_hint)
+        self.assertTrue(tools["update_cashflow"].annotations.destructive_hint)
 
 
 class CashflowPotActivityModelTests(unittest.TestCase):
@@ -132,7 +132,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
         ):
             result = await create_activity("unit-1", "cf-1", activity)
 
-        self.assertIs(result, expected)
+        self.assertEqual(result, expected)
         payload = call.await_args.kwargs["payload"]
         self.assertEqual(payload["start"], 0)
         self.assertEqual(payload["cost_schedule_json"], [25000.0, 0.0, 10000.0])
@@ -191,7 +191,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
                 "unit-1", "cf-1", CashflowUpdate(inflow_curve_type=None)
             )
 
-        self.assertIs(result, expected)
+        self.assertEqual(result, expected)
         call.assert_awaited_once_with(
             access_token="unit-token",
             cashflow_id="cf-1",
@@ -214,7 +214,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
                 "unit-1", "a-1", ActivityUpdate(cost_schedule_json=None)
             )
 
-        self.assertIs(result, expected)
+        self.assertEqual(result, expected)
         call.assert_awaited_once_with(
             access_token="unit-token",
             activity_id="a-1",
@@ -240,7 +240,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
                 FinancingFacilityUpdate(limit=250000),
             )
 
-        self.assertIs(result, expected)
+        self.assertEqual(result, expected)
         call.assert_awaited_once_with(
             access_token="unit-token",
             cashflow_id="cf-1",
@@ -267,7 +267,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
                 FinancingFacilityUpdate(limit=None),
             )
 
-        self.assertIs(result, expected)
+        self.assertEqual(result, expected)
         call.assert_awaited_once_with(
             access_token="unit-token",
             cashflow_id="cf-1",
@@ -292,7 +292,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
             ),
         ):
             result = await export_cashflow_json("unit-1", "cf-1")
-        self.assertIs(result, expected)
+        self.assertEqual(result, expected)
 
     async def test_excel_tool_returns_signed_metadata_without_fetching_file(self) -> None:
         expected = {
