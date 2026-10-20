@@ -27,6 +27,7 @@ _MAX_LIFETIME_SECONDS = 3600
 @dataclass
 class _CachedToken:
     value: str
+    app_token: str
     subject: str
     app_id: str
     valid_until: float
@@ -54,12 +55,14 @@ async def get_cashflowpot_app_token(
     app_id: str,
     oauth_expires_at: int | None,
     exchange: Callable[[], Awaitable[str]],
+    prefer_app_token: bool = False,
 ) -> str:
     """Reuse the app token for this OAuth connection, exchanging on cache miss.
 
     q_flow handles moving from an application token to a Unit token and returns
     any updated token in the same API response. No Unit token exchange is
-    initiated directly from the MCP.
+    initiated directly from the MCP. General operations can choose the saved
+    app token, even when the latest token is Unit-scoped.
     """
     key = sha256(oauth_token.encode("utf-8")).hexdigest()
     _current_connection.set((key, subject, app_id))
@@ -83,11 +86,11 @@ async def get_cashflowpot_app_token(
             and cached.valid_until > now
         ):
             _tokens.move_to_end(key)
-            return cached.value
+            return cached.app_token if prefer_app_token else cached.value
 
         token = await exchange()
         _tokens[key] = _CachedToken(
-            value=token, subject=subject, app_id=app_id, valid_until=valid_until,
+            value=token, app_token=token, subject=subject, app_id=app_id, valid_until=valid_until,
         )
         _tokens.move_to_end(key)
         _prune(time())
@@ -119,7 +122,7 @@ def accept_cashflowpot_token_from_qflow(
         or cached.subject != subject
         or cached.app_id != app_id
         or cached.valid_until <= time()
-        or cached.value != sent_token
+        or (cached.value != sent_token and cached.app_token != sent_token)
     ):
         return False
     if replacement == sent_token:
@@ -149,6 +152,12 @@ def accept_cashflowpot_token_from_qflow(
 
     # No await between compare and replacement: safe against concurrent
     # requests in this event loop. Late responses cannot undo newer tokens.
-    cached.value = replacement
+    # Preserve the general app token for list/create/restore operations even
+    # after q_flow moves the active token into a specific Unit. An updated
+    # user token replaces the app token; a Unit token never does.
+    if not claims.get("unit_id"):
+        cached.app_token = replacement
+    if cached.value == sent_token:
+        cached.value = replacement
     _tokens.move_to_end(key)
     return True
