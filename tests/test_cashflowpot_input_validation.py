@@ -142,6 +142,23 @@ class CashflowPotInputValidationTests(unittest.TestCase):
         self.assertEqual(explicit.model_dump(exclude_none=True),
                          {"name": "OD", "interest_rate": 0.0, "fees": 0.0, "revolving": False})
 
+    def test_prework_delay_is_opt_in_and_clear_for_all_activity_inputs(self) -> None:
+        activity = ActivityInput(name="One period", cost=100, duration=1, start=1)
+        self.assertNotIn("mobilization_period", activity.model_dump(exclude_none=True))
+        self.assertEqual(
+            ActivityInput(name="One period", cost=100, duration=1, start=1,
+                          mobilization_period=2).model_dump(exclude_none=True)["mobilization_period"],
+            2,
+        )
+        self.assertEqual(ActivityUpdate().model_dump(exclude_unset=True), {})
+        self.assertEqual(ActivityUpdate(mobilization_period=0).model_dump(exclude_unset=True),
+                         {"mobilization_period": 0})
+        for model in (ActivityInput, ActivityUpdate):
+            description = model.model_fields["mobilization_period"].description
+            self.assertIn("Defaults to 0", description)
+            self.assertIn("frontend P2", description)
+            self.assertIn("delay=1", description)
+
     def test_partial_updates_preserve_explicit_nulls_and_zeros(self) -> None:
         update = FinancingFacilityUpdate(interest_rate=None, fees=0, limit=None)
         self.assertEqual(update.model_dump(exclude_unset=True),
