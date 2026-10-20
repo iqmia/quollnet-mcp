@@ -193,7 +193,8 @@ class TokenReuseTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(token_store.accept_cashflowpot_token_from_qflow(
                 sent_token=used, replacement_token=b,
             ))
-            self.assertEqual(await cashflowpot_token(), a)
+            self.assertEqual(await cashflowpot_token("project-a"), a)
+            self.assertEqual(await cashflowpot_token(), original)
 
     async def test_invalid_token_does_not_enter_cache_or_tool_results(self):
         user = oauth_token("user-one")
