@@ -3,6 +3,7 @@ name: Dedicated CashflowPot MCP CI
 on:
   push:
     branches:
+      - main
       - feature/dedicated-cashflowpot-mcp
   workflow_dispatch:
 
