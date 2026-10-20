@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 
 from quollnet_mcp.config import Settings, get_settings
+from quollnet_mcp.cashflowpot.token_store import accept_cashflowpot_token_from_qflow
 
 
 class QFlowClientError(Exception):
@@ -63,7 +64,21 @@ class QFlowClient:
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+
+            # q_flow handles Unit loading and expired-token refresh. It may
+            # return a replacement bearer in the Authorization header and/or
+            # at the root of its JSON response. Adopt it for future MCP calls.
+            replacement = response.headers.get("Authorization")
+            if isinstance(data, dict):
+                replacement = replacement or data.get("token")
+                # Never expose an internal QAuth bearer to ChatGPT.
+                data.pop("token", None)
+            accept_cashflowpot_token_from_qflow(
+                sent_token=access_token,
+                replacement_token=replacement,
+            )
+            return data
         except httpx.HTTPStatusError as error:
             # Upstream messages can contain SQL errors, credentials or user
             # identifiers. Do not copy arbitrary response bodies into tool errors.
