@@ -7,6 +7,7 @@ handling. They do not contact a deployed service or exercise live OAuth.
 import copy
 import json
 import os
+import time
 import unittest
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -21,6 +22,7 @@ for _key in ("QAUTH_APP_ID", "QAUTH_PUBLIC_KEY", "QAPP_APP_ID", "CASHFLOWPOT_APP
     os.environ.setdefault(_key, "test-wire-contract")
 
 from quollnet_mcp.cashflowpot.server import register_cashflowpot_tools
+from quollnet_mcp.cashflowpot import token_store
 from quollnet_mcp.dependencies import qauth_client, qflow_client
 from quollnet_mcp.services.qauth_client import QAuthClientError
 
@@ -184,6 +186,8 @@ def _cases():
 
 class CashflowPotWireContractTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        token_store._tokens.clear()
+        token_store._current_connection.set(None)
         self.server = MCPServer("cashflowpot-wire-contract-tests")
         register_cashflowpot_tools(self.server)
         self.advertised = {tool.name: tool for tool in await self.server.list_tools()}
@@ -191,7 +195,7 @@ class CashflowPotWireContractTests(unittest.IsolatedAsyncioTestCase):
         self.exchange = AsyncMock(return_value="application-secret-not-for-output")
         self.access = patch(
             "quollnet_mcp.cashflowpot.auth.get_access_token",
-            return_value=SimpleNamespace(subject="user-1", token="mcp-secret-not-for-output"),
+            return_value=SimpleNamespace(subject="user-1", token="mcp-secret-not-for-output", expires_at=int(time.time()) + 3600),
         )
         self.access.start()
         self.exchange_patch = patch.object(qauth_client, "exchange_app_token", self.exchange)
@@ -230,7 +234,7 @@ class CashflowPotWireContractTests(unittest.IsolatedAsyncioTestCase):
         self.exchange.assert_awaited_once_with(
             mcp_access_token="mcp-secret-not-for-output",
             target_app_id=qauth_client.settings.cashflowpot_app_id,
-            unit_id="unit-1" if case.scoped else None,
+            unit_id=None,
         )
         content = result.structured_content
         if case.name == "list_financing_facility_presets":
