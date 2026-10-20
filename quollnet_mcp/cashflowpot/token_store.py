@@ -155,9 +155,13 @@ def accept_cashflowpot_token_from_qflow(
     # Preserve the general app token for list/create/restore operations even
     # after q_flow moves the active token into a specific Unit. An updated
     # user token replaces the app token; a Unit token never does.
-    if not claims.get("unit_id"):
+    changed = False
+    if not claims.get("unit_id") and cached.app_token == sent_token:
         cached.app_token = replacement
+        changed = True
     if cached.value == sent_token:
         cached.value = replacement
-    _tokens.move_to_end(key)
-    return True
+        changed = True
+    if changed:
+        _tokens.move_to_end(key)
+    return changed
