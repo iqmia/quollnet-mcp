@@ -35,7 +35,7 @@ class EffectivePropertiesTests(unittest.IsolatedAsyncioTestCase):
             "created_by": "private-user", "token": "private-token",
         }
         with patch.object(cashflows, "get_cashflow", new=AsyncMock(return_value={"data": snapshot})):
-            result = await cashflows.get_cashflow_results("unit-1", "cf-1")
+            result = await cashflows.get_cashflow_results("unit-1", "cf-1", detail="full")
         properties = result["properties"]
         self.assertEqual(properties["contract"]["advance"], 0.05)
         self.assertEqual(properties["contract"]["duration_for_payment"], 2)
@@ -51,7 +51,7 @@ class EffectivePropertiesTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_legacy_properties_are_not_fabricated(self):
         with patch.object(cashflows, "get_cashflow", new=AsyncMock(return_value={"data": {"id": "old"}})):
-            result = await cashflows.get_cashflow_results("unit-1", "old")
+            result = await cashflows.get_cashflow_results("unit-1", "old", detail="full")
         self.assertNotIn("advance", result["properties"]["contract"])
         self.assertNotIn("interest_rate", result["properties"]["forecast"])
 

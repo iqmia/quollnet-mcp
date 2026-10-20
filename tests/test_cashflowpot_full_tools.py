@@ -162,7 +162,7 @@ class CashflowPotToolForwardingTests(unittest.IsolatedAsyncioTestCase):
             "quollnet_mcp.cashflowpot.tools.cashflows.get_cashflow",
             new=AsyncMock(return_value={"data": snapshot}),
         ):
-            result = await get_cashflow_results("unit-1", "cf-1")
+            result = await get_cashflow_results("unit-1", "cf-1", detail="full")
 
         for key in (
             "facility_inflow",

@@ -114,6 +114,14 @@ class UnitsMetadata(TypedDict, total=False):
     interest_rate_basis: Literal["per_model_period"]
     amount_unit: Literal["project_currency"]
     period_unit: Literal["model_period"]
+    periods_per_year: Annotated[int | None, Field(description="Calendar frequency if explicitly known; null means the model does not establish annual-to-period conversion. Never infer monthly periods from the default rates or DLP.")]
+
+
+@with_config(_OUTPUT_CONFIG)
+class ActivityCounts(TypedDict):
+    total: int
+    work: int
+    scheduled_cost: int
 
 
 @with_config(_OUTPUT_CONFIG)
@@ -122,6 +130,37 @@ class CashflowProperties(TypedDict, total=False):
     forecast: ForecastProperties
     activities: list[Activity]
     financing: list[Facility]
+    units: UnitsMetadata
+    activity_counts: ActivityCounts
+
+
+@with_config(_OUTPUT_CONFIG)
+class CompactFacility(TypedDict, total=False):
+    id: str | None
+    name: str
+    type: str
+    limit: Number | None
+    interest_rate: Number | None
+    fees: Number | None
+    draw_method: str
+    repayment_method: str
+    advance_portion: Number | None
+    repayment_percent: Number | None
+    revolving: bool | None
+    start: int | None
+    end: int | None
+    sweep_priority: int | None
+    installment_start: int | None
+    installment_interval: int | None
+    installment_count: int | None
+
+
+@with_config(_OUTPUT_CONFIG)
+class CompactProperties(TypedDict):
+    contract: ContractProperties
+    forecast: ForecastProperties
+    activity_counts: ActivityCounts
+    financing: list[CompactFacility]
     units: UnitsMetadata
 
 
@@ -140,15 +179,15 @@ class Summary(TypedDict, total=False):
     subcontracted_cost: Number
     self_performed_cost: Number
     direct_cost: Number
-    financing_cost: Number
+    financing_cost: Annotated[Number, Field(description="Total explicit facility interest and fees in project currency. Legacy scenario interest is reflected in the cash balance rather than this facility-only KPI.")]
     total_cost: Number
     total_facility_interest: Number
     total_facility_fees: Number
     minimum_pre_financing_balance: Number
     minimum_pre_financing_period: int | None
-    peak_pre_financing_need: Number
+    peak_pre_financing_need: Annotated[Number, Field(description="Maximum funding gap before financing and financing costs, in project currency; zero means no pre-financing deficit.")]
     peak_pre_financing_period: int | None
-    peak_facility_outstanding: Number
+    peak_facility_outstanding: Annotated[Number, Field(description="Maximum combined outstanding principal across all modeled facilities, including owner contributions; this is not necessarily bank debt alone.")]
     final_facility_outstanding: Number
     final_cash_balance: Number
     cash_after_debt_settlement: Number
@@ -156,7 +195,21 @@ class Summary(TypedDict, total=False):
     dlp: int
     financial_horizon: int
     contractor_contribution: Number
-    peak_unfunded_shortfall: Number
+    peak_unfunded_shortfall: Annotated[Number, Field(description="Maximum remaining cash deficit after the modeled facilities and financing charges; zero means their modeled cash needs are covered.")]
+
+
+@with_config(_OUTPUT_CONFIG)
+class CompactResults(TypedDict):
+    id: str
+    unit_id: str | None
+    name: str | None
+    summary: Summary
+    properties: CompactProperties
+
+
+@with_config(_OUTPUT_CONFIG)
+class CompactResultsResponse(TypedDict):
+    data: CompactResults
 
 
 @with_config(_OUTPUT_CONFIG)
@@ -176,6 +229,7 @@ class FacilityRow(TypedDict, total=False):
 
 @with_config(_OUTPUT_CONFIG)
 class ResultsResponse(TypedDict, total=False):
+    detail: Annotated[Literal["summary", "full"], Field(description="Summary omits calculation arrays, schedules and activity definitions. Full includes detailed calculation series and all activity/financing properties.")]
     id: str
     unit_id: str | None
     name: str | None

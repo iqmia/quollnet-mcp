@@ -243,7 +243,7 @@ class FinancingFacilityUpdate(BaseModel):
     )
     interest_rate: NonNegativeNumber | None = Field(
         default=None,
-        description="Interest fraction per model period on opening outstanding principal; 0.01 means 1% per period, and explicit zero is interest-free. Draws start accruing in the following period." + _FACILITY_DEFAULT,
+        description="Interest fraction per model period on opening outstanding principal; 0.01 means 1% per period, and explicit zero is interest-free. Draws accrue from the following period. Convert annual bank quotes only after confirming nominal/effective basis and periods/year: 7% nominal annual with monthly periods is 0.07/12, not 0.07." + _FACILITY_DEFAULT,
     )
     fees: NonNegativeNumber | None = Field(
         default=None,
@@ -334,7 +334,7 @@ class CashflowUpdate(BaseModel):
     )
     interest_rate: NonNegativeNumber | None = Field(
         default=None,
-        description="Legacy scenario financing fraction per model period, used when no explicit financing facilities are configured; 0.005 means 0.5% per period." + _CASHFLOW_DEFAULT,
+        description="Legacy scenario financing fraction per model period, used when no explicit financing facilities are configured; 0.005 means 0.5% per period. Convert annual quotes using the confirmed rate basis and periods/year (7% nominal annual with monthly periods is 0.07/12). Model periods do not inherently mean months." + _CASHFLOW_DEFAULT,
     )
     contract_value: NonNegativeNumber | None = Field(
         default=None,

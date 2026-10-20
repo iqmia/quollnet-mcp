@@ -1,7 +1,7 @@
 from mcp.server.mcpserver.exceptions import ToolError
 
-from quollnet_mcp.cashflowpot.parameters import ProjectId, CashflowId, ConfirmPermanent
-from quollnet_mcp.cashflowpot.responses import CashflowResponse, MessageResponse, PortableResponse, ResultsResponse, project_response
+from quollnet_mcp.cashflowpot.parameters import ProjectId, CashflowId, ConfirmPermanent, ResultDetail
+from quollnet_mcp.cashflowpot.responses import CashflowResponse, CompactResultsResponse, MessageResponse, PortableResponse, ResultsResponse, project_response
 from quollnet_mcp.cashflowpot.auth import cashflowpot_token
 from quollnet_mcp.cashflowpot.models import (
     CashflowInput,
@@ -20,8 +20,19 @@ async def get_cashflow(unit_id: ProjectId, cashflow_id: CashflowId) -> CashflowR
     ))
 
 
-async def get_cashflow_results(unit_id: ProjectId, cashflow_id: CashflowId) -> ResultsResponse:
-    """Return calculated results and the effective saved source properties."""
+async def get_cashflow_results(
+    unit_id: ProjectId, cashflow_id: CashflowId, detail: ResultDetail = "summary",
+) -> ResultsResponse:
+    """Analyze funding needs, financing choices and payment terms using backend KPIs."""
+    if detail not in {"summary", "full"}:
+        raise ToolError("detail must be summary or full")
+    if detail == "summary":
+        token = await cashflowpot_token(unit_id)
+        response = await call_qflow(CompactResultsResponse, lambda: qflow_client.get_cashflow(
+            access_token=token, cashflow_id=cashflow_id, detail="summary",
+        ))
+        return project_response({**response["data"], "detail": "summary"}, ResultsResponse)
+
     response = await get_cashflow(unit_id, cashflow_id)
     data = response.get("data", response) if isinstance(response, dict) else response
     if not isinstance(data, dict):
@@ -42,6 +53,7 @@ async def get_cashflow_results(unit_id: ProjectId, cashflow_id: CashflowId) -> R
     )
     # Only expose values supplied by q_flow. Do not infer defaults or provenance.
     result = {key: data[key] for key in keys if key in data}
+    result["detail"] = "full"
     result["properties"] = {
         "contract": {key: data[key] for key in contract_keys if key in data},
         "forecast": {key: data[key] for key in forecast_keys if key in data},
@@ -51,6 +63,7 @@ async def get_cashflow_results(unit_id: ProjectId, cashflow_id: CashflowId) -> R
             "percentages": "fraction", "period_index_base": 0,
             "period_unit": "model_period", "amount_unit": "project_currency",
             "interest_rate_basis": "per_model_period",
+            "periods_per_year": None,
         },
     }
     return project_response(result, ResultsResponse)

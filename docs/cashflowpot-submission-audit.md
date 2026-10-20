@@ -58,6 +58,30 @@ New bank facilities (Letter of Credit, Overdraft, PPC Discount, Working Capital,
 
 ## Verification and release boundary
 
+`get_cashflow_results` defaults to `detail="summary"` for funding-gap questions,
+financing comparisons and contract negotiations. It requests the backend's
+`GET /cashflow/<id>?detail=summary` view, retaining authoritative KPIs and compact
+contract/forecast/facility properties, activity counts and unit conventions.
+Summary mode excludes period arrays, full activity definitions and draw/repayment
+schedules. `detail="full"` retains the complete calculation arrays and properties;
+`get_cashflow` and the backend's default response remain full for compatibility.
+Deploy q_flow first: an older backend that ignores the detail query fails the
+compact output contract rather than silently returning incomplete properties.
+
+All 33 tools advertise typed `outputSchema` objects in the merged server's
+`tools/list`. The connected ChatGPT definitions observed during this review still
+had older descriptions, generic return wrappers and no permanent-delete guard
+argument. A direct production `tools/list` request without an OAuth token returned
+401, so a fresh authenticated production scan remains necessary after deployment
+and connector refresh. A working backend preset call confirms connectivity, not
+the deployed MCP schema version.
+
+Rate guidance explicitly distinguishes nominal annual `r / m` from effective
+annual `(1 + r) ** (1 / m) - 1`, reuses user-confirmed period conventions, and
+requires clarification when they are unknown. `periods_per_year=null` declares
+that the backend has no stored calendar frequency. The preset rate, DLP and fee
+divisor do not imply monthly periods.
+
 Run `python -m unittest discover -q` in quollnet-mcp and `python -m pytest -q` in q_flow. Contract tests validate advertised input/output schemas and output minimization. Wire tests exercise all 33 tool registrations with realistic mocked backend envelopes, checking both text and structured content. Isolated SQLite backend tests cover permission denial, parent scoping, cascading permanent deletion, repeat/missing IDs, QAuth failures with no local loss, and calculation failure rollback. Regression tests also cover partial activity edits and portable legacy-null round trips.
 
 Deploy the q_flow change before the MCP change. Reconnect or refresh the development integration so it sees the new schemas/confirmation argument. Run a fresh-account OAuth flow and the official portal tool scan against the deployed build before submission. These local tests mock the QAuth service boundary and do not certify production OAuth/revocation behavior. No live user project was deleted during testing.
@@ -66,9 +90,9 @@ Project permanent deletion still calls QAuth before local database cleanup; thos
 
 ## Verified results
 
-- quollnet-mcp: **191 tests passed**, including 40 wire tests exercising all 33 public tools, schema validation, identity/permission failures and both response channels.
-- q_flow: **404 tests passed**, with existing dependency/SQLAlchemy deprecation warnings. Coverage includes facility-value fee defaults across add/import/new scenario creation, explicit overrides, one-time fee charging, saved-value preservation and invalid fee-basis validation. Explicit null facility start/interest/fees fail validation atomically rather than reaching a calculator error.
-- Both repositories pass `git diff --check`. Independent review found no remaining blocker after the legacy-null and schedule-schema fixes.
+- quollnet-mcp: **196 tests passed**, including 40 wire tests exercising all 33 public tools and new summary/full query, output minimization, invalid-mode and typed-schema checks.
+- q_flow: **415 tests passed**, with existing dependency/SQLAlchemy deprecation warnings. Coverage includes summary/full KPI parity, scheduled/deleted activity counts, payload-size reduction, denied access, legacy-interest shortfalls, invalid detail values, financing defaults and permanent-deletion behavior.
+- Both repositories pass `git diff --check`. Independent review found no blockers and checked real financed/unfinanced backend responses against the MCP compact projection and advertised JSON schema.
 - Backend suites must run serially: existing legacy tests share an on-disk SQLite fixture. An earlier concurrent verification run collided in decorator/database tests with table-already-exists errors; isolated serial runs pass without application changes for that test-run collision.
 
 ## Official sources

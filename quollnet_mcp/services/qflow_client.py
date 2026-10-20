@@ -123,9 +123,10 @@ class QFlowClient:
         )
 
     # Cashflows
-    async def get_cashflow(self, *, access_token: str, cashflow_id: str) -> Any:
+    async def get_cashflow(self, *, access_token: str, cashflow_id: str, detail: str | None = None) -> Any:
         return await self._request_json(
-            "GET", f"/cashflow/{self._quote(cashflow_id)}", access_token=access_token
+            "GET", f"/cashflow/{self._quote(cashflow_id)}", access_token=access_token,
+            params={"detail": detail} if detail is not None else None,
         )
 
     async def create_cashflow(self, *, access_token: str, unit_id: str, payload: Mapping[str, Any]) -> Any:

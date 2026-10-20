@@ -154,7 +154,7 @@ def _cases():
         _Case("restore_cashflow_project", project_args, "PUT", "/restore_project/unit-1", message("Project restored successfully"), scoped=False),
         _Case("hard_delete_cashflow_project", {**project_args, "confirm_permanent": True}, "DELETE", "/hard_delete_project/unit-1", message("Project hard deleted successfully"), scoped=False),
         _Case("get_cashflow", _SCENARIO_ARGS, "GET", "/cashflow/cf-1", cf_response),
-        _Case("get_cashflow_results", _SCENARIO_ARGS, "GET", "/cashflow/cf-1", cf_response),
+        _Case("get_cashflow_results", {**_SCENARIO_ARGS, "detail": "full"}, "GET", "/cashflow/cf-1", cf_response),
         _Case("create_cashflow", {**project_args, "cashflow": _SOURCE}, "POST", "/project/unit-1/cashflows/import", envelope(data=snapshot, message="Cashflow imported successfully"), {"format": "cashflowpot.cashflow", "version": 1, "cashflow": generated_source}),
         _Case("update_cashflow", {**_SCENARIO_ARGS, "cashflow": {"description": None, "inflow_curve_type": None}}, "PUT", "/cashflow/cf-1", envelope(data=snapshot, message="Cashflow updated successfully"), {"description": None, "inflow_curve_type": None}),
         _Case("delete_cashflow", _SCENARIO_ARGS, "DELETE", "/cashflow/cf-1", message("Cashflow deleted successfully")),

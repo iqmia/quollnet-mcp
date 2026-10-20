@@ -1,5 +1,5 @@
 """Shared descriptions for opaque resource identifiers, never credentials."""
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, StrictBool
 
@@ -10,3 +10,4 @@ FacilityId = Annotated[str, Field(min_length=1, max_length=128, description="Sta
 ActivityIds = Annotated[list[ActivityId], Field(min_length=1, description="IDs of deleted activities to restore in the selected project. Every affected scenario is permission checked.")]
 FacilityIds = Annotated[list[FacilityId], Field(description="Every existing facility ID exactly once, in the desired evaluation order; an empty list is valid only if the scenario has no facilities.")]
 ConfirmPermanent = Annotated[StrictBool, Field(description="Explicit safeguard for irreversible deletion. Set true only when the user has authorized permanently deleting the identified item and its stated children; false or omission makes no change.")]
+ResultDetail = Annotated[Literal["summary", "full"], Field(description="Use summary (default) for funding needs, financing comparisons and contract negotiation: KPIs and compact properties, without period arrays, schedules or activity details. Use full for period-by-period analysis, charts or complete activity properties.")]
