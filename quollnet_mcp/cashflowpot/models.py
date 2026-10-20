@@ -132,7 +132,7 @@ class ActivityUpdate(BaseModel):
     )
     start: NonNegativePeriod | None = Field(
         default=None,
-        description="Zero-based project period offset at which this activity starts; zero starts at the scenario origin." + _ACTIVITY_DEFAULT,
+        description="Zero-based project period offset: start=0 is frontend P1, start=1 is frontend P2. Physical work starts after any mobilization_period delay." + _ACTIVITY_DEFAULT,
     )
     advance: Fraction | None = Field(
         default=None,
@@ -160,7 +160,7 @@ class ActivityUpdate(BaseModel):
     )
     mobilization_period: NonNegativePeriod | None = Field(
         default=None,
-        description="Initial pre-work/no-work delay in model periods for Work, retained under its legacy field name; not a mobilization percentage." + _ACTIVITY_DEFAULT,
+        description="Initial number of no-work periods after activity start (legacy name; not a percentage). Defaults to 0 when omitted on creation; only use a positive value when the user requests a pre-work delay. Example: start=1 (frontend P2), duration=1, delay=0 means work and finish in P2; delay=1 means work and finish in P3. On update, omission retains the saved delay.",
     )
     subcontracted: Fraction | None = Field(
         default=None,
@@ -192,7 +192,7 @@ class ActivityInput(ActivityUpdate):
     )
     start: NonNegativePeriod = Field(
         default=0,
-        description="Zero-based project period offset at which this activity starts; omitted means zero, the scenario origin.",
+        description="Zero-based project period offset: start=0 is frontend P1, start=1 is frontend P2. Omitted start is 0. With duration=1 and no pre-work delay, start=1 means work finishes in P2.",
     )
 
     @model_validator(mode="after")
