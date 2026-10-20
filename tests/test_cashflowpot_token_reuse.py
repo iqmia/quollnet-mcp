@@ -156,7 +156,10 @@ class TokenReuseTests(unittest.IsolatedAsyncioTestCase):
             sent = await cashflowpot_token()
             result = await client.list_projects(access_token=sent)
             self.assertEqual(result, {"message": "ok"})
-            self.assertEqual(await cashflowpot_token(), updated)
+            self.assertEqual(await cashflowpot_token("project-two"), updated)
+            # General operations keep the original app token, avoiding a
+            # deleted Unit's bearer when listing or restoring projects.
+            self.assertEqual(await cashflowpot_token(), original)
 
     async def test_other_user_token_is_never_cached(self):
         user = oauth_token("user-one")
