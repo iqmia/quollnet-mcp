@@ -15,9 +15,14 @@ project permissions are handled by the server; never ask users for bearer tokens
 signing keys or passwords in tool inputs.
 
 Percentages are fractions: 0.10 means 10 percent. Model periods are zero-based,
-and activity starts use zero-based integer periods. Financing facilities remain
-embedded in the cashflow scenario even though this MCP exposes individual
-facility tools for convenience.
+and activity starts use zero-based integer periods (start=0 is user-facing P1,
+start=1 is P2). mobilization_period is the number of pre-work/no-work periods
+after activity start, not a percentage or part of the work duration. It defaults
+to 0 on creation when omitted; set a positive delay only when the user asks.
+For example, start=1 and duration=1 means work finishes in P2 with delay=0,
+but in P3 with delay=1. Do not infer a delay from the activity category.
+Financing facilities remain embedded in the cashflow scenario even though this
+MCP exposes individual facility tools for convenience.
 
 Use get_cashflow_results with detail="summary" (the default) for funding questions,
 headline KPIs, financing comparisons and contract negotiations. This retrieves a
