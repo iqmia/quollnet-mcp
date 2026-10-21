@@ -101,6 +101,7 @@ class VersionRequest(Schema):
 class RecordLinkCreate(TargetRef):
     version: int | None = Field(default=None, ge=1)
     reviewed_attachments: dict[str, str] | None = None
+    reviewed_records: dict[str, int] | None = None
 
 
 class EvidenceManifest(Schema):

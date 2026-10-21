@@ -41,8 +41,11 @@ class QledgerRecordTests(unittest.IsolatedAsyncioTestCase):
                     linked_to_object_id=E,
                     version=2,
                     reviewed_attachments={A: "hash"},
+                    reviewed_records={R: 3},
                 )
-                post = RecordPost(version=2, reviewed_attachments={A: "hash"})
+                post = RecordPost(
+                    version=2, reviewed_attachments={A: "hash"}, reviewed_records={R: 3}
+                )
                 cases = [
                     (
                         lambda: t.list_qledger_records(
@@ -51,6 +54,7 @@ class QledgerRecordTests(unittest.IsolatedAsyncioTestCase):
                                 linked_to_object="journal_entry",
                                 linked_to_object_id=E,
                                 types="invoice,receipt",
+                                is_template=True,
                                 page=2,
                             ),
                         ),
@@ -62,7 +66,9 @@ class QledgerRecordTests(unittest.IsolatedAsyncioTestCase):
                     (
                         lambda: t.create_qledger_record(
                             U,
-                            RecordCreate(type="invoice", data={"total": "12.12"}),
+                            RecordCreate(
+                                type="invoice", is_template=True, data={"layout": []}
+                            ),
                             "k",
                         ),
                         "POST",
@@ -71,7 +77,7 @@ class QledgerRecordTests(unittest.IsolatedAsyncioTestCase):
                     ),
                     (
                         lambda: t.update_qledger_record(
-                            U, R, RecordPatch(version=2, data=None)
+                            U, R, RecordPatch(version=2, data=None, is_template=False)
                         ),
                         "PATCH",
                         "/" + R,
@@ -106,6 +112,14 @@ class QledgerRecordTests(unittest.IsolatedAsyncioTestCase):
                         False,
                     ),
                     (
+                        lambda: t.unpost_qledger_record(
+                            U, R, VersionRequest(version=2)
+                        ),
+                        "POST",
+                        "/" + R + "/unpost",
+                        False,
+                    ),
+                    (
                         lambda: t.link_qledger_record(U, R, target, "k"),
                         "POST",
                         "/" + R + "/links",
@@ -135,8 +149,11 @@ class QledgerRecordTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual("Idempotency-Key" in seen[-1].headers, keyed)
                 self.assertEqual(seen[0].url.params["types"], "invoice,receipt")
                 self.assertEqual(seen[0].url.params["page"], "2")
+                self.assertEqual(seen[0].url.params["is_template"], "true")
+                self.assertTrue(json.loads(seen[2].content)["is_template"])
                 self.assertEqual(
-                    json.loads(seen[3].content), {"version": 2, "data": None}
+                    json.loads(seen[3].content),
+                    {"version": 2, "data": None, "is_template": False},
                 )
                 self.assertEqual(json.loads(seen[4].content), {"version": 2})
                 conflict = True
@@ -151,3 +168,4 @@ class QledgerRecordTests(unittest.IsolatedAsyncioTestCase):
                     payload = json.loads(seen[-1].content)
                     self.assertEqual(payload["version"], 2)
                     self.assertEqual(payload["reviewed_attachments"], {A: "hash"})
+                    self.assertEqual(payload["reviewed_records"], {R: 3})

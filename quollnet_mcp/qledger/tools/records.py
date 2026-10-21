@@ -88,6 +88,18 @@ async def post_qledger_record(unit_id: UUID, record_id: UUID, request: RecordPos
     )
 
 
+async def unpost_qledger_record(
+    unit_id: UUID, record_id: UUID, request: VersionRequest
+):
+    return await call(
+        qledger_client,
+        "POST",
+        _record(unit_id, record_id) + "/unpost",
+        unit_id=unit_id,
+        body=request,
+    )
+
+
 async def list_qledger_record_links(unit_id: UUID, record_id: UUID):
     return await call(
         qledger_client, "GET", _record(unit_id, record_id) + "/links", unit_id=unit_id
