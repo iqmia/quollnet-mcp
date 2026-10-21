@@ -15,7 +15,7 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
         server = build_qledger_server(settings())
         tools = await server.list_tools()
         names = {t.name for t in tools}
-        self.assertEqual(len(names), 48)
+        self.assertEqual(len(names), 49)
         for required in [
             "execute_qledger_operation",
             "post_qledger_transaction",

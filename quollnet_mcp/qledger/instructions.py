@@ -5,6 +5,23 @@ never infer permission from a role name or try an elevated identity after a deni
 Discover units, then use explicit unit_id on every unit tool. Admin manages access;
 controller can post; accountant prepares; auditor reads. Actual token grants decide.
 
+Accounts are shared across charts. Each transaction has one readable chart name,
+default main, inherited by every line. Lists and accounting reports default to main;
+select the requested chart explicitly and never combine charts silently. A chart
+name is classification, not access control. Reversals retain the original chart.
+Each line can optionally have readable project and cost_center text; no lookup IDs
+are needed. A cost_center may be a dotted cost code such as concrete.material.ready-mix.
+Use list_qledger_classification_values to discover existing spellings; paginate and
+reuse them. These values describe what has been used, not a mandatory master list.
+Different lines may use different labels, on any account type, without balancing
+per project or cost center. Use exact filters or cost_center_prefix for a dotted
+path and descendants. Combined line filters match the same line; transaction lists
+return the whole matching transaction. For expense totals filter account_type=expense
+and calculate total_debit minus total_credit from full backend totals, not a page.
+Filtered trial balances need not balance; do not count payments, assets and expenses
+together or add account rollups to their underlying balances. These labels do not
+prescribe journal entries, recognize expenses or change accounting treatment.
+
 Prepare and explain the proposed transaction and supporting documents according to
 user instructions before posting. Journal creation and reversal create drafts.
 Accounting journal posting is permanent: send the exact reviewed version and reviewed_evidence map.

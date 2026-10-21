@@ -56,6 +56,7 @@ _GROUPS = (
         journals,
         (
             "list_qledger_transactions",
+            "list_qledger_classification_values",
             "get_qledger_transaction",
             "create_qledger_transaction",
             "update_qledger_transaction",
@@ -116,11 +117,16 @@ _KEYED = {
     "execute_qledger_operation",
 }
 _DESCRIPTIONS = {
+    "list_qledger_classification_values": "Discover existing readable chart, project or cost-center names before creating new spellings. Includes live drafts and posted entries, excludes deleted entries. field=chart lists all used charts; project/cost_center are scoped to query.chart (default main). Paginate distinct values; prefix is literal text.",
+    "list_qledger_transactions": "Find transactions in one chart (default main), optionally by dates and matching line project, cost-center/code, dotted prefix or account type. Combined line filters must match the same line. Full transactions are returned, including their other lines.",
+    "create_qledger_transaction": "Prepare a draft transaction in one chart (default main). Optional project and cost_center are readable text on each line; different lines can use different labels. Reuse existing spellings. Accounting classification stays in account_id.",
+    "get_qledger_ledger": "Read posted lines and running balances in one chart (default main). Filter by project, cost_center or dotted cost_center_prefix and account_type. Running balances include earlier matching lines. For expense analysis select account_type=expense; never sum every tagged debit as cost.",
+    "get_qledger_trial_balance": "Read account totals and hierarchy rollups in one chart (default main). Optional line filters narrow the totals; a filtered result need not balance. Net expenses are total_debit minus total_credit with account_type=expense. Do not add rolled-up and own balances together.",
     "load_qledger_unit": "Load a unit and its hierarchy. Tokens remain internal; use the returned unit ID explicitly on subsequent tools.",
     "invite_qledger_member": "Invite a member with explicit role names. send_email=true may send an invitation. Requires invite:member.",
     "add_qledger_member_roles": "Add the supplied roles to a member; this does not replace all existing roles. Requires edit:member.",
     "post_qledger_transaction": "Permanently post the exact reviewed journal version and evidence. A 409 requires renewed review; never substitute fresh versions automatically.",
-    "reverse_qledger_transaction": "Prepare a NEW draft reversal using the supplied date and description. Posting is a separate authorized operation.",
+    "reverse_qledger_transaction": "Prepare a NEW draft reversal using the supplied date and description. The backend preserves the original chart, project and cost-center labels while swapping debits and credits. The reversal must remain in its original chart. Posting is a separate authorized operation.",
     "post_qledger_record": "Protect a record and its descendant records by posting. Supply the reviewed version, reviewed_records map and reviewed_attachments hashes. Accounting entries are unaffected.",
     "unpost_qledger_record": "Unpost the reviewed record version only when no parent record, transaction or journal line is posted. Requires record:post. Descendants retain their own posted state. Accounting journals cannot be unposted.",
     "link_qledger_record": "Link a record to a parent. A posted record, journal or line parent posts its source record and descendants; supply the source's reviewed version, reviewed_records and file hashes.",

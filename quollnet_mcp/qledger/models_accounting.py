@@ -2,7 +2,15 @@ from datetime import date
 from typing import Literal
 from uuid import UUID
 from pydantic import Field, model_validator
-from .models import Schema, Currency, Money, Rate, EvidenceManifest, VersionRequest
+from .models import (
+    Schema,
+    Currency,
+    Money,
+    Rate,
+    EvidenceManifest,
+    VersionRequest,
+    ClassificationName,
+)
 
 
 class AccountCreate(Schema):
@@ -40,12 +48,24 @@ class LineCreate(Schema):
     debit: Money = "0"
     credit: Money = "0"
     description: str | None = Field(default=None, max_length=1000)
+    project: ClassificationName | None = Field(
+        default=None,
+        description="Readable project name; reuse existing spelling. Optional, no lookup ID required.",
+    )
+    cost_center: ClassificationName | None = Field(
+        default=None,
+        description="Readable purpose or dotted cost code, e.g. concrete.material.ready-mix. Optional on any account type.",
+    )
     currency: Currency | None = None
     foreign_amount: Money | None = None
     exchange_rate: Rate | None = None
 
 
 class JournalCreate(Schema):
+    chart: ClassificationName = Field(
+        default="main",
+        description="All lines inherit this chart; balances are separate per chart. Accounts may be reused across charts.",
+    )
     transaction_date: date
     description: str = Field(min_length=1, max_length=2000)
     lines: list[LineCreate] = Field(min_length=2, max_length=1000)
@@ -55,6 +75,13 @@ class JournalPatch(VersionRequest):
     transaction_date: date | None = None
     description: str | None = Field(default=None, min_length=1, max_length=2000)
     lines: list[LineCreate] | None = Field(default=None, min_length=2, max_length=1000)
+    chart: ClassificationName | None = None
+
+    @model_validator(mode="after")
+    def chart_not_null(self):
+        if "chart" in self.model_fields_set and self.chart is None:
+            raise ValueError("chart cannot be null")
+        return self
 
 
 class PostRequest(VersionRequest):

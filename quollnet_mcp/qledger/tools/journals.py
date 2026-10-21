@@ -1,6 +1,6 @@
 from uuid import UUID
 from quollnet_mcp.dependencies import qledger_client
-from quollnet_mcp.qledger.models import DateQuery
+from quollnet_mcp.qledger.models import ClassificationQuery, JournalQuery
 from quollnet_mcp.qledger.models_accounting import (
     JournalCreate,
     JournalPatch,
@@ -14,11 +14,23 @@ def _entry(unit_id, entry_id):
     return unit_path(unit_id) + "/journal-entries/" + object_id(entry_id)
 
 
-async def list_qledger_transactions(unit_id: UUID, query: DateQuery = DateQuery()):
+async def list_qledger_transactions(
+    unit_id: UUID, query: JournalQuery = JournalQuery()
+):
     return await call(
         qledger_client,
         "GET",
         unit_path(unit_id) + "/journal-entries",
+        unit_id=unit_id,
+        query=query,
+    )
+
+
+async def list_qledger_classification_values(unit_id: UUID, query: ClassificationQuery):
+    return await call(
+        qledger_client,
+        "GET",
+        unit_path(unit_id) + "/journal-classifications",
         unit_id=unit_id,
         query=query,
     )
