@@ -159,3 +159,97 @@ https://mcp.quollnet.com/cashflowpot
 The CashflowPot target application must continue to allow Quollnet MCP token
 exchange (`allow_quollnet_mcp_exchange=true`). Application and Unit permissions
 remain authoritative after exchange.
+
+## QLedger
+
+The same `combined_app:app` process can additionally serve the dedicated MCP at
+`https://mcp.quollnet.com/qledger`. It exposes 47 named tools for units/members,
+accounts/settings, transactions/reversals/posting, reports, records, shared
+attachments and atomic document registration. Existing `/mcp` and `/cashflowpot`
+tool sets remain separate.
+
+Enable this optional endpoint in the deployment environment:
+
+```dotenv
+QLEDGER_ENABLED=true
+QLEDGER_APP_ID=<the-existing-QLedger-QAuth-application-ID>
+QLEDGER_BASE_URL=<the-deployed-QLedger-HTTPS-service-root>
+QLEDGER_MCP_RESOURCE_URI=https://mcp.quollnet.com/qledger
+QLEDGER_TIMEOUT_SECONDS=30
+QLEDGER_MAX_FILE_BYTES=10485760
+QLEDGER_MAX_BATCH_FILE_BYTES=20971520
+```
+
+The base URL can include the backend's deployment path prefix; the adapter appends
+`api/...`. It must use HTTPS without credentials, query or fragment. Required
+QLedger settings are checked only when enabled; disabled deployments continue
+serving their existing MCPs. Restart the process after configuration changes.
+
+In QAuth, register the exact `/qledger` MCP resource on the central gateway and
+allow exchange into the QLedger target (`allow_quollnet_mcp_exchange=true`). The
+current central exchange policy permits eligible open/shared-key targets; a
+shared-key target requires existing active AppUser access. It excludes closed
+and invite-only targets. Do not change those policies merely to make a failed
+connection succeed. The deployed QLedger API must include the approved records
+and shared-attachments implementation.
+
+The connected MCP identity is exchanged for normal QLedger application/unit
+tokens. QLedger validates signed token permissions locally (including local
+invalidation markers); QAuth owns token exchange and unit/member administration.
+No admin credential or model-supplied token is used. Every unit tool has an
+explicit unit_id, and token-bearing unit responses are sanitized.
+
+Roles bundle permissions: accountant prepares, controller posts, auditor reads,
+and admin manages unit access. Admin does not automatically get accounting
+posting authority; admin + controller is a valid combination. Actual token
+permissions, including invite:member and journal:post/record:post, decide access.
+
+Creation/reversal/link/upload/batch tools that require `idempotency_key` send it
+to QLedger unchanged. After a lost response retry the same key, payload and
+original file bytes. There are no automatic mutation retries. An unkeyed mutation
+timeout has an unknown outcome: inspect state before resubmitting. A 409 review
+conflict requires reloading and reviewing changes; the adapter never substitutes
+fresh versions/hashes or silently enables a period-lock override.
+
+Transaction posting requires its reviewed version and exact reviewed_evidence.
+Record posting requires its reviewed version, reviewed_records descendant-version
+map and reviewed_attachments hashes for the full subtree. Atomic
+operations support a new journal, optional records/files and explicit links;
+post flags remain explicit, and existing records that may post carry their
+reviewed source evidence. QLedger enforces posting, immutable content, protected
+links, parent-derived file access and recursive orphan cleanup. Generic records
+have caller-defined finite JSON data; approved unit-linked record schemas can
+validate templates and instances independently. QLedger does not render layouts.
+
+File uploads use original-byte base64 without a data-URI prefix. They do not
+convert images. The maximum per-file schema size is 10 MiB (configurable lower);
+the default aggregate batch limit is 20 MiB. Downloads return filename/hash
+metadata plus an embedded binary resource with its specific MIME type. The
+resource reader `qledger://units/{unit_id}/attachments/{attachment_id}` returns
+bytes as application/octet-stream and checks current authorization on every read.
+Protected backend URLs and bearer tokens are never presented as public downloads.
+
+Binary-resource rendering and chat-file upload integration depend on the client.
+Before live acceptance, verify a real small invoice upload and PDF/image download
+in the intended client. Automated SDK/ASGI tests verify the protocol adapter with
+controlled upstreams; they do not prove ChatGPT rendering or production access.
+
+Design, route-to-tool inventory and implementation plan are under
+`docs/superpowers/{specs,plans}/2026-10-17-qledger-mcp-*`.
+
+### Record templates and reversible posting (21 October 2026)
+
+Requires QEntries migration `0004` and its corresponding API. The dedicated server
+now registers 48 tools, including `unpost_qledger_record`. Accounting journals
+remain permanently posted. Record unposting requires `record:post`, the current
+version, and no posted record/journal/line parent. It affects only that record.
+Posting or linking beneath a posted record also protects all record descendants;
+review their versions and attachment hashes before submitting the request.
+
+`is_template` is available in record create/PATCH/query and atomic records.
+Use the ordinary type (`invoice`, `quotation`) for both templates and instances,
+with the flag distinguishing them. Copy preserves the flag. Link adopted templates
+to the unit and resolve document aliases from its catalog. `relation` remains a
+caller-defined descriptive label. Template family/design version selection and
+QTypeset rendering are client responsibilities; attach issued PDFs for exact
+reproduction. This adapter adds no QTypeset credentials or rendering tool.
