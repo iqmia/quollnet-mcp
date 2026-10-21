@@ -3,7 +3,7 @@
 import json
 from datetime import date
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -12,6 +12,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StrictStr,
+    StringConstraints,
     TypeAdapter,
     model_validator,
 )
@@ -43,6 +44,9 @@ Money = Annotated[StrictStr, AfterValidator(_money)]
 Rate = Annotated[StrictStr, AfterValidator(_rate)]
 Currency = Annotated[str, Field(pattern=r"^[A-Z]{3}$")]
 RoleName = Annotated[str, Field(min_length=1, max_length=100)]
+ClassificationName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+]
 
 
 def finite_json(value: Any) -> Any:
@@ -83,8 +87,41 @@ class DateQuery(PageQuery):
         return self
 
 
-class LedgerQuery(DateQuery):
+class JournalQuery(DateQuery):
+    chart: ClassificationName = Field(
+        default="main",
+        description="One chart per transaction; reports default to main. Accounts are shared across charts.",
+    )
+    project: ClassificationName | None = Field(
+        default=None, description="Exact readable project name on a line."
+    )
+    cost_center: ClassificationName | None = Field(
+        default=None,
+        description="Exact readable cost-center or cost-code label on a line.",
+    )
+    cost_center_prefix: ClassificationName | None = Field(
+        default=None,
+        description="Match this dotted cost-code path and its descendants, e.g. concrete.material.",
+    )
+    account_type: (
+        Literal["asset", "liability", "equity", "revenue", "expense"] | None
+    ) = None
+
+
+class LedgerQuery(JournalQuery):
     account_id: UUID | None = None
+
+
+class ClassificationQuery(PageQuery):
+    field: Literal["chart", "project", "cost_center"]
+    chart: ClassificationName = Field(
+        default="main",
+        description="Scope project/cost-center discovery to this chart; ignored when field=chart.",
+    )
+    prefix: ClassificationName | None = Field(
+        default=None,
+        description="Literal text prefix for existing values; paginate results.",
+    )
 
 
 class TargetRef(Schema):
@@ -101,6 +138,7 @@ class VersionRequest(Schema):
 class RecordLinkCreate(TargetRef):
     version: int | None = Field(default=None, ge=1)
     reviewed_attachments: dict[str, str] | None = None
+    reviewed_records: dict[str, int] | None = None
 
 
 class EvidenceManifest(Schema):

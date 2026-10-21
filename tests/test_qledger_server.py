@@ -15,10 +15,11 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
         server = build_qledger_server(settings())
         tools = await server.list_tools()
         names = {t.name for t in tools}
-        self.assertEqual(len(names), 47)
+        self.assertEqual(len(names), 49)
         for required in [
             "execute_qledger_operation",
             "post_qledger_transaction",
+            "unpost_qledger_record",
             "download_qledger_attachment",
             "invite_qledger_member",
         ]:

@@ -212,12 +212,14 @@ conflict requires reloading and reviewing changes; the adapter never substitutes
 fresh versions/hashes or silently enables a period-lock override.
 
 Transaction posting requires its reviewed version and exact reviewed_evidence.
-Record posting requires its reviewed version and reviewed_attachments. Atomic
+Record posting requires its reviewed version, reviewed_records descendant-version
+map and reviewed_attachments hashes for the full subtree. Atomic
 operations support a new journal, optional records/files and explicit links;
 post flags remain explicit, and existing records that may post carry their
 reviewed source evidence. QLedger enforces posting, immutable content, protected
 links, parent-derived file access and recursive orphan cleanup. Generic records
-have caller-defined finite JSON data; invoice schemas/layouts are not enforced.
+have caller-defined finite JSON data; approved unit-linked record schemas can
+validate templates and instances independently. QLedger does not render layouts.
 
 File uploads use original-byte base64 without a data-URI prefix. They do not
 convert images. The maximum per-file schema size is 10 MiB (configurable lower);
@@ -234,3 +236,20 @@ controlled upstreams; they do not prove ChatGPT rendering or production access.
 
 Design, route-to-tool inventory and implementation plan are under
 `docs/superpowers/{specs,plans}/2026-10-17-qledger-mcp-*`.
+
+### Record templates and reversible posting (21 October 2026)
+
+Requires QEntries migration `0004` and its corresponding API. The dedicated server
+now registers 48 tools, including `unpost_qledger_record`. Accounting journals
+remain permanently posted. Record unposting requires `record:post`, the current
+version, and no posted record/journal/line parent. It affects only that record.
+Posting or linking beneath a posted record also protects all record descendants;
+review their versions and attachment hashes before submitting the request.
+
+`is_template` is available in record create/PATCH/query and atomic records.
+Use the ordinary type (`invoice`, `quotation`) for both templates and instances,
+with the flag distinguishing them. Copy preserves the flag. Link adopted templates
+to the unit and resolve document aliases from its catalog. `relation` remains a
+caller-defined descriptive label. Template family/design version selection and
+QTypeset rendering are client responsibilities; attach issued PDFs for exact
+reproduction. This adapter adds no QTypeset credentials or rendering tool.

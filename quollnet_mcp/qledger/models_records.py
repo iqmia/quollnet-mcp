@@ -6,6 +6,7 @@ from .models_accounting import JournalCreate
 
 class RecordCreate(Schema):
     type: str = Field(min_length=1, max_length=100)
+    is_template: bool = False
     document_date: date | None = None
     reference: str | None = Field(default=None, max_length=255)
     data: JsonData
@@ -13,6 +14,7 @@ class RecordCreate(Schema):
 
 
 class RecordPatch(VersionRequest):
+    is_template: bool | None = None
     type: str | None = Field(default=None, min_length=1, max_length=100)
     document_date: date | None = None
     reference: str | None = Field(default=None, max_length=255)
@@ -21,9 +23,11 @@ class RecordPatch(VersionRequest):
 
 class RecordPost(VersionRequest):
     reviewed_attachments: dict[str, str]
+    reviewed_records: dict[str, int] = Field(default_factory=dict)
 
 
 class RecordQuery(PageQuery):
+    is_template: bool | None = None
     linked_to_object: str | None = Field(default=None, min_length=1, max_length=100)
     linked_to_object_id: str | None = Field(default=None, min_length=1, max_length=255)
     linked_to_app: str = Field(default="", max_length=128)
@@ -42,6 +46,7 @@ class OperationRef(Schema):
     key: str | None = Field(default=None, min_length=1, max_length=100)
     version: int | None = Field(default=None, ge=1)
     reviewed_attachments: dict[str, str] | None = None
+    reviewed_records: dict[str, int] | None = None
 
     @model_validator(mode="after")
     def reference(self):
