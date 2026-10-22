@@ -163,7 +163,7 @@ remain authoritative after exchange.
 ## QLedger
 
 The same `combined_app:app` process can additionally serve the dedicated MCP at
-`https://mcp.quollnet.com/qledger`. It exposes 47 named tools for units/members,
+`https://mcp.quollnet.com/qledger`. It exposes 51 named tools for units/members,
 accounts/settings, transactions/reversals/posting, reports, records, shared
 attachments and atomic document registration. Existing `/mcp` and `/cashflowpot`
 tool sets remain separate.
@@ -251,5 +251,36 @@ Use the ordinary type (`invoice`, `quotation`) for both templates and instances,
 with the flag distinguishing them. Copy preserves the flag. Link adopted templates
 to the unit and resolve document aliases from its catalog. `relation` remains a
 caller-defined descriptive label. Template family/design version selection and
-QTypeset rendering are client responsibilities; attach issued PDFs for exact
-reproduction. This adapter adds no QTypeset credentials or rendering tool.
+document composition are client responsibilities; attach issued PDFs for exact
+reproduction. The rendering tools below call QEntries, which delegates to QTypeset.
+
+### Document design and PDF rendering
+
+Deploy the matching QEntries PDF API before using these tools. Configure
+`QTYPESET_API_KEY` and optional `QTYPESET_BASE_URL` on the QEntries server, never
+in this gateway or ChatGPT. There is no local PDF engine or fallback generator.
+This addition requires no new database migration.
+
+`get_qledger_document_design_guidance(unit_id, include_schema=true)` loads advisory
+design defaults and the native v2 schema. Typography, restrained table styling,
+plain issued-by/to blocks without section bars, images and pagination are covered.
+User design preferences override these defaults within QTypeset capabilities.
+
+The AI saves a complete native document in `record.data.rendering` (or directly
+in `record.data`), with historical values and any image attachment bindings in
+`record.data.rendering_assets`. Native asset `file` names map to authorized
+QEntries attachment IDs. QEntries sends original PNG/JPEG bytes as multipart.
+
+`render_qledger_record_pdf` takes the exact reviewed record version. By default it
+returns a preview as embedded PDF bytes without changing the record. Set
+`save_to_record=true` with a stable `idempotency_key` to preserve the PDF as an
+ordinary attachment on a draft record; record:view and record:link are required.
+Retries reuse that same PDF. Rendering never posts records or accounting entries.
+Use normal reviewed posting separately when authorized. New saves to posted
+records are rejected; download the preserved attachment for a historical copy.
+
+After deploying both services, refresh the testing plugin's tool catalog at the
+configured `/qledger` endpoint. Test QAuth login/unit selection, guidance/schema,
+an image-bearing preview, saving/retrying and PDF download in ChatGPT. Automated
+tests cover mocked upstream APIs; live credentials and ChatGPT's binary-file
+presentation still need that acceptance check.

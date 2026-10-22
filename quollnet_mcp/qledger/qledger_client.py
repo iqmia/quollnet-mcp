@@ -1,6 +1,7 @@
 """Fixed-origin QLedger HTTP adapter. Mutations are never automatically retried."""
 
 import re
+from uuid import UUID
 from urllib.parse import urlsplit
 import httpx
 from quollnet_mcp.qledger.models import validate_idempotency_key
@@ -234,6 +235,63 @@ class QledgerClient:
                 message="QLedger returned invalid JSON.",
                 status=response.status_code,
             ) from None
+
+    async def render_pdf(
+        self, path, *, access_token, payload, max_bytes, idempotency_key=None
+    ):
+        path = self._path(path)
+        mutating = bool(payload.get("save_to_record"))
+        method_context = "POST" if mutating else "GET"
+        try:
+            async with self._client.stream(
+                "POST",
+                path,
+                json=payload,
+                headers=self._headers(access_token, idempotency_key),
+            ) as response:
+                chunks, size = [], 0
+                async for chunk in response.aiter_bytes():
+                    size += len(chunk)
+                    if size > max_bytes:
+                        raise self._transport_error(
+                            method_context,
+                            idempotency_key,
+                            message="Rendered PDF exceeds the configured transfer limit.",
+                        )
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+                self._check(
+                    httpx.Response(response.status_code, content=content),
+                    access_token,
+                    method_context,
+                    idempotency_key,
+                )
+                attachment_id = response.headers.get("X-QEntries-Attachment-Id")
+                try:
+                    if attachment_id:
+                        attachment_id = str(UUID(attachment_id))
+                    valid = (
+                        response.status_code == 200
+                        and response.headers.get("Content-Type", "")
+                        .split(";")[0]
+                        .strip()
+                        == "application/pdf"
+                        and content.startswith(b"%PDF-")
+                        and int(response.headers.get("X-QEntries-Record-Version", "0"))
+                        == payload["version"]
+                        and bool(attachment_id) == mutating
+                    )
+                except (ValueError, TypeError):
+                    valid = False
+                if not valid:
+                    raise self._transport_error(
+                        method_context,
+                        idempotency_key,
+                        message="QLedger returned an invalid PDF response.",
+                    )
+                return content, attachment_id
+        except httpx.RequestError:
+            raise self._transport_error(method_context, idempotency_key) from None
 
     async def download(self, path, *, access_token, max_bytes):
         path = self._path(path)

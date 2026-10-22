@@ -5,6 +5,35 @@ never infer permission from a role name or try an elevated identity after a deni
 Discover units, then use explicit unit_id on every unit tool. Admin manages access;
 controller can post; accountant prepares; auditor reads. Actual token grants decide.
 
+QTypeset is the only PDF engine. Before designing a document or changing a template,
+call get_qledger_document_design_guidance; request include_schema=true when needed.
+Its typography/layout defaults are advisory, and the user's preferences take priority.
+Prefer clean Issued By/Issued To blocks without colored section bars, restrained
+typography and clear totals. Use only capabilities in the native QTypeset v2 contract;
+do not invent CSS, font families, layout options, business rules or journal recipes.
+Save complete rendering input in the instance's record.data.rendering (or use a
+complete native document directly as record.data). Keep template identity/design
+version and other business metadata outside the strict native rendering object.
+The caller prepares data from the invoice/quotation/etc. record; values alone need
+a layout. Images must be real authorized QEntries PNG/JPEG attachments, bound to
+multipart part names with asset_attachment_ids or saved record.data.rendering_assets.
+No image URLs or invented base64. Link images to the issued instance if they must
+survive removal of their unit/template links. Rendering copies may use formatted
+string amount fields to preserve exact display; do not change ledger decimal strings.
+
+Use render_qledger_record_pdf with the exact reviewed record version. Previews
+return actual embedded PDF bytes and do not save or post anything. When issuance
+is authorized, save_to_record=true plus a stable idempotency_key preserves the PDF
+as an ordinary attachment on a draft record; normal permissions/lifecycle apply.
+Then protect the record using the normal reviewed evidence/version workflow when
+authorized. Rendering never posts a record or journal automatically. If draft data
+changes, review/regenerate its PDF before issuance. Correct 409 conflicts by renewed
+review, never by silently substituting a fresh version. For an exact historical
+copy, download the preserved PDF, rather than applying a new template or current
+party details. Preview resource bytes are embedded in the result and are not a
+public download URL or a durable stored resource; saved PDFs use existing attachment
+resources. The QTypeset key is configured only on the QEntries server, not in tools.
+
 Accounts are shared across charts. Each transaction has one readable chart name,
 default main, inherited by every line. Lists and accounting reports default to main;
 select the requested chart explicitly and never combine charts silently. A chart
@@ -47,7 +76,7 @@ If absent, save a new QTypeset-compatible template with is_template=true linked 
 the unit. Create the document instance with is_template=false; copying preserves
 the flag, so change it on a copied draft. Save complete rendering input and
 historical issuer/party details, template identity/version, and attach the issued
-PDF from the separate QTypeset API. QLedger does not render PDFs. A price offer
+PDF using render_qledger_record_pdf; QEntries delegates printing to QTypeset. A price offer
 needs no journal. Relation is a caller-defined label without lifecycle meaning.
 A link to a posted template posts its child; preserve provenance in JSON while
 the instance must stay draft. Find a transaction's invoices/receipts with record

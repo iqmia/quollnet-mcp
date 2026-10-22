@@ -17,6 +17,7 @@ from quollnet_mcp.qledger.tools import (
     records,
     attachments,
     operations,
+    documents,
 )
 
 
@@ -105,6 +106,7 @@ _GROUPS = (
         ),
     ),
     (operations, ("execute_qledger_operation",)),
+    (documents, ("get_qledger_document_design_guidance", "render_qledger_record_pdf")),
 )
 _KEYED = {
     "create_qledger_transaction",
@@ -117,6 +119,8 @@ _KEYED = {
     "execute_qledger_operation",
 }
 _DESCRIPTIONS = {
+    "get_qledger_document_design_guidance": "Read advisory document design guidance before creating or changing templates: typography, headers/logos, neutral Issued By/To blocks, tables, totals, spacing, images and issuance snapshots. User preferences override defaults. Set include_schema=true for the native QTypeset v2 contract when designing an unfamiliar layout.",
+    "render_qledger_record_pdf": "Render the exact reviewed QEntries record through QTypeset and return actual PDF bytes. Read design guidance first. Store complete v2 input in record.data.rendering or directly in record.data; image parts bind to authorized attachment IDs and are sent as multipart. save_to_record=true preserves the PDF on a draft record, requires record:link and a stable idempotency_key; retry with the same request/key. Otherwise this is an unsaved preview. Rendering does not post records or journals. Posted records can be previewed; download their preserved attachments for exact historical copies.",
     "list_qledger_classification_values": "Discover existing readable chart, project or cost-center names before creating new spellings. Includes live drafts and posted entries, excludes deleted entries. field=chart lists all used charts; project/cost_center are scoped to query.chart (default main). Paginate distinct values; prefix is literal text.",
     "list_qledger_transactions": "Find transactions in one chart (default main), optionally by dates and matching line project, cost-center/code, dotted prefix or account type. Combined line filters must match the same line. Full transactions are returned, including their other lines.",
     "create_qledger_transaction": "Prepare a draft transaction in one chart (default main). Optional project and cost_center are readable text on each line; different lines can use different labels. Reuse existing spellings. Accounting classification stays in account_id.",
