@@ -147,12 +147,24 @@ class EvidenceManifest(Schema):
 
 
 class FileInput(Schema):
-    filename: str = Field(min_length=1, max_length=255)
-    content_type: str = Field(
+    """ChatGPT file params; optional names follow the official host contract."""
+
+    download_url: str = Field(min_length=1, max_length=16000, repr=False)
+    file_id: str = Field(min_length=1, max_length=1000)
+    mime_type: str = Field(
         default="application/octet-stream",
         pattern=r"^[A-Za-z0-9!#$&^_.+\-]+/[A-Za-z0-9!#$&^_.+\-]+$",
     )
-    file_base64: str = Field(min_length=1, max_length=13981016, repr=False)
+    file_name: str = Field(default="", max_length=255)
+    filename: str = Field(
+        default="", max_length=255, description="Optional alias for file_name."
+    )
+
+    @model_validator(mode="after")
+    def matching_names(self):
+        if self.filename and self.file_name and self.filename != self.file_name:
+            raise ValueError("filename and file_name must agree")
+        return self
 
 
 class UnitCreate(Schema):
@@ -174,6 +186,11 @@ class MemberRoles(Schema):
 
 
 class AttachmentQuery(PageQuery):
+    relation: str | None = Field(default=None, max_length=100)
     linked_to_object: str = Field(min_length=1, max_length=100)
     linked_to_object_id: str = Field(min_length=1, max_length=255)
     linked_to_app: str = Field(default="", max_length=128)
+
+
+class AttachmentShareRequest(Schema):
+    expires_in: int = Field(default=3600, ge=60, le=604800)

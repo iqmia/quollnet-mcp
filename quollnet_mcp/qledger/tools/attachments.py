@@ -1,19 +1,23 @@
 import json
 import re
 from uuid import UUID
-from mcp.types import CallToolResult, EmbeddedResource, TextContent
+
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import CallToolResult, EmbeddedResource, TextContent
+
 from quollnet_mcp.dependencies import qledger_client
 from quollnet_mcp.qledger import auth
+from quollnet_mcp.qledger.files import attachment_resource, download_file
 from quollnet_mcp.qledger.models import (
+    AttachmentQuery,
+    AttachmentShareRequest,
     FileInput,
     TargetRef,
-    AttachmentQuery,
     api_payload,
 )
-from quollnet_mcp.qledger.files import decode_file, attachment_resource
 from quollnet_mcp.qledger.qledger_client import QledgerClientError
-from .common import call, unit_path, object_id
+
+from .common import call, object_id, unit_path
 
 
 def _attachment(unit_id, attachment_id):
@@ -40,7 +44,7 @@ async def upload_qledger_attachment(
     unit_id: UUID, parent: TargetRef, file: FileInput, idempotency_key: str
 ):
     path = unit_path(unit_id) + "/attachments"
-    decoded = decode_file(
+    decoded = await download_file(
         file, max_bytes=qledger_client.settings.qledger_max_file_bytes
     )
     token = await auth.unit_token(unit_id)
@@ -123,4 +127,27 @@ async def replace_qledger_attachment_link(
         _attachment(unit_id, attachment_id) + "/links/" + object_id(link_id),
         unit_id=unit_id,
         body=request,
+    )
+
+
+async def create_qledger_attachment_share(
+    unit_id: UUID, attachment_id: UUID, request: AttachmentShareRequest
+):
+    return await call(
+        qledger_client,
+        "POST",
+        _attachment(unit_id, attachment_id) + "/share",
+        unit_id=unit_id,
+        body=request,
+    )
+
+
+async def revoke_qledger_attachment_share(
+    unit_id: UUID, attachment_id: UUID, share_id: UUID
+):
+    return await call(
+        qledger_client,
+        "DELETE",
+        _attachment(unit_id, attachment_id) + "/shares/" + object_id(share_id),
+        unit_id=unit_id,
     )

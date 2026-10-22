@@ -221,13 +221,29 @@ links, parent-derived file access and recursive orphan cleanup. Generic records
 have caller-defined finite JSON data; approved unit-linked record schemas can
 validate templates and instances independently. QLedger does not render layouts.
 
-File uploads use original-byte base64 without a data-URI prefix. They do not
-convert images. The maximum per-file schema size is 10 MiB (configurable lower);
-the default aggregate batch limit is 20 MiB. Downloads return filename/hash
-metadata plus an embedded binary resource with its specific MIME type. The
-resource reader `qledger://units/{unit_id}/attachments/{attachment_id}` returns
-bytes as application/octet-stream and checks current authorization on every read.
-Protected backend URLs and bearer tokens are never presented as public downloads.
+File uploads use ChatGPT file references, advertised with `openai/fileParams`.
+The `file` object requires `download_url` and `file_id`; `mime_type` and `file_name`
+are optional, and `filename` is an optional compatibility alias. Missing names use
+`upload.bin`. No AI-facing upload accepts base64. The adapter validates trusted
+OpenAI file hostnames, resolves only public addresses, pins the checked address
+while preserving TLS verification, disables redirects/proxies and sends no backend
+credentials to the file host. It downloads original bytes with per-file and batch
+bounds, then forwards multipart content. Atomic operation `files` is an ordered
+list matching `operation.attachments`; backend multipart part names are unchanged.
+Default limits are 10 MiB/file and 20 MiB/operation, configurable lower.
+
+For a link, `get_qledger_attachment` returns metadata including `protected_url`
+without transferring bytes. This URL requires authentication. Explicit public
+sharing uses `create_qledger_attachment_share` with `expires_in` (default 3600,
+range 60..604800 seconds); revoke it with `revoke_qledger_attachment_share`.
+For inspection, `download_qledger_attachment` returns original bytes as an embedded
+resource with filename/hash metadata. The resource reader
+`qledger://units/{unit_id}/attachments/{attachment_id}` checks current authorization
+on every read. Never append bearer tokens to a URL or call protected URLs public.
+
+The file schema follows the [official OpenAI file input contract](https://developers.openai.com/plugins/reference#define-file-inputs),
+verified 22 October 2026: all four supported properties must be declared, and only
+`download_url` and `file_id` are required inside each file object.
 
 Binary-resource rendering and chat-file upload integration depend on the client.
 Before live acceptance, verify a real small invoice upload and PDF/image download
@@ -240,8 +256,8 @@ Design, route-to-tool inventory and implementation plan are under
 ### Record templates and reversible posting (21 October 2026)
 
 Requires QEntries migration `0004` and its corresponding API. The dedicated server
-now registers 48 tools, including `unpost_qledger_record`. Accounting journals
-remain permanently posted. Record unposting requires `record:post`, the current
+registers 56 tools, including `unpost_qledger_record`. Accounting journals
+remain permanently posted. Non-issued record unposting requires `record:post`, the current
 version, and no posted record/journal/line parent. It affects only that record.
 Posting or linking beneath a posted record also protects all record descendants;
 review their versions and attachment hashes before submitting the request.
@@ -259,7 +275,7 @@ reproduction. The rendering tools below call QEntries, which delegates to QTypes
 Deploy the matching QEntries PDF API before using these tools. Configure
 `QTYPESET_API_KEY` and optional `QTYPESET_BASE_URL` on the QEntries server, never
 in this gateway or ChatGPT. There is no local PDF engine or fallback generator.
-This addition requires no new database migration.
+Deploy the matching attachment sharing and atomic issuance backend API and its migration before enabling these workflows.
 
 `get_qledger_document_design_guidance(unit_id, include_schema=true)` loads advisory
 design defaults and the native v2 schema. Typography, restrained table styling,
@@ -271,13 +287,35 @@ in `record.data`), with historical values and any image attachment bindings in
 `record.data.rendering_assets`. Native asset `file` names map to authorized
 QEntries attachment IDs. QEntries sends original PNG/JPEG bytes as multipart.
 
-`render_qledger_record_pdf` takes the exact reviewed record version. By default it
-returns a preview as embedded PDF bytes without changing the record. Set
-`save_to_record=true` with a stable `idempotency_key` to preserve the PDF as an
-ordinary attachment on a draft record; record:view and record:link are required.
-Retries reuse that same PDF. Rendering never posts records or accounting entries.
-Use normal reviewed posting separately when authorized. New saves to posted
-records are rejected; download the preserved attachment for a historical copy.
+`render_qledger_record_pdf` always produces a DRAFT preview, even for posted
+records. Unsaved previews default to embedded PDF bytes. With `save_to_record=true`
+and a stable key, it saves a watermarked `draft_pdf` and defaults to
+`response_mode=metadata`, returning download metadata without transferring the PDF.
+Set `response_mode=binary` only when byte inspection is wanted. Posting the record
+does not turn a saved draft preview into an issued document.
+
+`issue_qledger_record` is the separate final action: with the exact reviewed
+version, descendant versions, attachment hashes and a stable idempotency key,
+QEntries atomically renders the final PDF, preserves its checksum and posts the
+record and evidence. It returns `record_id`, `version`, `attachment_id`, `filename`,
+`content_type`, `sha256`, `protected_url`, `verification_url` and `status`. No binary
+transfer is needed for links. Optional `issuer_name` snapshots a display name;
+`unit_id` determines issuer scope. Use `get_qledger_issued_document` later for the same preserved link/verification
+metadata and current status without rendering or binary transfer. `update_qledger_document_status`
+sets terminal `cancelled`/`superseded` status with an exact version and a required
+reason (max 1000 characters); it preserves the PDF/evidence and requires
+`record:view` + `record:post`. An identical status/reason retry is idempotent.
+Issued records cannot be unposted. Accounting
+journals remain a separate explicit workflow. Filter attachment lists by
+`relation=issued_pdf` for exact historical copies or `draft_pdf` for previews.
+
+Use party/contact Records linked to customer/vendor/partner accounts and contracts;
+snapshot reviewed party values into issued documents. Find templates by ordinary
+document type and `is_template=true`. Keep document numbering separate from journal
+posting and never invent local tax treatment. Upload real OCR/extracted text as a separate `.txt` attachment linked to the original
+attachment (`linked_to_object=attachment`, its ID, `relation=text` or `ocr`). Preserve
+optional original ID/hash and extraction provenance in a companion Record; attachment
+metadata has no arbitrary data field. Never overwrite original evidence bytes.
 
 After deploying both services, refresh the testing plugin's tool catalog at the
 configured `/qledger` endpoint. Test QAuth login/unit selection, guidance/schema,

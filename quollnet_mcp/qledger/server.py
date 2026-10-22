@@ -1,25 +1,28 @@
 """Dedicated QLedger surface; shares OAuth infrastructure, never accounting authority."""
 
 import base64
+
 from mcp.server import MCPServer
 from mcp.server.auth.settings import AuthSettings
 from mcp.types import ToolAnnotations
+
 from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import Settings
 from quollnet_mcp.qledger.files import attachment_resource
 from quollnet_mcp.qledger.instructions import QLEDGER_INSTRUCTIONS
 from quollnet_mcp.qledger.tools import (
-    units,
     accounts,
-    settings as ledger_settings,
-    journals,
-    reports,
-    records,
     attachments,
-    operations,
     documents,
+    journals,
+    operations,
+    records,
+    reports,
+    units,
 )
-
+from quollnet_mcp.qledger.tools import (
+    settings as ledger_settings,
+)
 
 _GROUPS = (
     (
@@ -97,6 +100,8 @@ _GROUPS = (
         (
             "list_qledger_attachments",
             "get_qledger_attachment",
+            "create_qledger_attachment_share",
+            "revoke_qledger_attachment_share",
             "upload_qledger_attachment",
             "download_qledger_attachment",
             "list_qledger_attachment_links",
@@ -106,9 +111,19 @@ _GROUPS = (
         ),
     ),
     (operations, ("execute_qledger_operation",)),
-    (documents, ("get_qledger_document_design_guidance", "render_qledger_record_pdf")),
+    (
+        documents,
+        (
+            "get_qledger_document_design_guidance",
+            "render_qledger_record_pdf",
+            "issue_qledger_record",
+            "get_qledger_issued_document",
+            "update_qledger_document_status",
+        ),
+    ),
 )
 _KEYED = {
+    "issue_qledger_record",
     "create_qledger_transaction",
     "reverse_qledger_transaction",
     "create_qledger_record",
@@ -120,7 +135,14 @@ _KEYED = {
 }
 _DESCRIPTIONS = {
     "get_qledger_document_design_guidance": "Read advisory document design guidance before creating or changing templates: typography, headers/logos, neutral Issued By/To blocks, tables, totals, spacing, images and issuance snapshots. User preferences override defaults. Set include_schema=true for the native QTypeset v2 contract when designing an unfamiliar layout.",
-    "render_qledger_record_pdf": "Render the exact reviewed QEntries record through QTypeset and return actual PDF bytes. Read design guidance first. Store complete v2 input in record.data.rendering or directly in record.data; image parts bind to authorized attachment IDs and are sent as multipart. save_to_record=true preserves the PDF on a draft record, requires record:link and a stable idempotency_key; retry with the same request/key. Otherwise this is an unsaved preview. Rendering does not post records or journals. Posted records can be previewed; download their preserved attachments for exact historical copies.",
+    "render_qledger_record_pdf": "Render a DRAFT preview of the exact reviewed QEntries record through QTypeset, including posted records. Read design guidance first. Complete native v2 input belongs in record.data.rendering; bind images to authorized attachment IDs. save_to_record=true saves a draft_pdf and requires a stable idempotency_key; its default response_mode=metadata returns URLs without transferring bytes. Unsaved previews default to binary. This never issues or posts. Use issue_qledger_record for final issuance and preserved attachments for historical copies.",
+    "get_qledger_issued_document": "Retrieve metadata for the preserved issued PDF and its current verification status, protected_url and verification_url months later. Does not regenerate or transfer binary content.",
+    "update_qledger_document_status": "Mark an issued document cancelled or superseded with its exact reviewed version and an explicit reason (max 1000 characters). Requires record:view and record:post. The PDF and posted evidence remain immutable, and accounting journals are unaffected. Status is terminal; an identical status/reason retry is idempotent. Use only with explicit authorization; inspect state after an uncertain response.",
+    "issue_qledger_record": "Atomically issue the reviewed document: render its final PDF, preserve exact bytes/checksum, and post the record and reviewed evidence. Requires explicit issuance authorization and exact reviewed version/evidence manifests. Returns attachment/download/verification metadata without binary transfer. Issued records cannot be unposted. Does not create or post accounting entries.",
+    "get_qledger_attachment": "Read attachment metadata including protected_url. Use for authenticated download links without transferring binary bytes; protected_url requires user authentication and is not public.",
+    "create_qledger_attachment_share": "Create a signed public download URL only when public sharing is requested. Expiry defaults to 3600 seconds (allowed 60..604800). The bearer link grants temporary access to original bytes; it can be revoked.",
+    "revoke_qledger_attachment_share": "Revoke the specified signed public share. Original bytes and authorized attachment access are preserved.",
+    "list_qledger_attachments": "List attachments linked to a parent, optionally filtered by exact relation. Use issued_pdf for final historical copies, draft_pdf for draft previews.",
     "list_qledger_classification_values": "Discover existing readable chart, project or cost-center names before creating new spellings. Includes live drafts and posted entries, excludes deleted entries. field=chart lists all used charts; project/cost_center are scoped to query.chart (default main). Paginate distinct values; prefix is literal text.",
     "list_qledger_transactions": "Find transactions in one chart (default main), optionally by dates and matching line project, cost-center/code, dotted prefix or account type. Combined line filters must match the same line. Full transactions are returned, including their other lines.",
     "create_qledger_transaction": "Prepare a draft transaction in one chart (default main). Optional project and cost_center are readable text on each line; different lines can use different labels. Reuse existing spellings. Accounting classification stays in account_id.",
@@ -132,14 +154,14 @@ _DESCRIPTIONS = {
     "post_qledger_transaction": "Permanently post the exact reviewed journal version and evidence. A 409 requires renewed review; never substitute fresh versions automatically.",
     "reverse_qledger_transaction": "Prepare a NEW draft reversal using the supplied date and description. The backend preserves the original chart, project and cost-center labels while swapping debits and credits. The reversal must remain in its original chart. Posting is a separate authorized operation.",
     "post_qledger_record": "Protect a record and its descendant records by posting. Supply the reviewed version, reviewed_records map and reviewed_attachments hashes. Accounting entries are unaffected.",
-    "unpost_qledger_record": "Unpost the reviewed record version only when no parent record, transaction or journal line is posted. Requires record:post. Descendants retain their own posted state. Accounting journals cannot be unposted.",
+    "unpost_qledger_record": "Unpost a non-issued reviewed record version only when no parent record, transaction or journal line is posted. Requires record:post. Descendants retain their own posted state. Accounting journals cannot be unposted.",
     "link_qledger_record": "Link a record to a parent. A posted record, journal or line parent posts its source record and descendants; supply the source's reviewed version, reviewed_records and file hashes.",
     "replace_qledger_record_link": "Atomically replace one record-parent link. Posted-parent protections and recursive orphan rules are enforced by QLedger.",
     "unlink_qledger_record": "Remove one parent link; affected unposted parentless children may be deleted recursively by QLedger.",
     "unlink_qledger_attachment": "Remove one parent link; an attachment with no remaining parent may be deleted by QLedger.",
     "download_qledger_attachment": "Retrieve original bytes as an authenticated binary MCP resource plus file metadata. Default maximum 10 MiB; rendering depends on the client.",
-    "upload_qledger_attachment": "Upload actual original file bytes as strict raw base64, with an initial parent. No image conversion; default limit 10 MiB.",
-    "execute_qledger_operation": "Atomically register records, a NEW journal, files and explicit links, with optional explicitly authorized posting. Existing records that may post need reviewed versions/hashes. Never split the request into separate creates.",
+    "upload_qledger_attachment": "Upload an authorized ChatGPT file reference with an initial parent. The adapter downloads bounded original bytes without conversion and forwards multipart data. file_name and filename are optional aliases; default limit 10 MiB.",
+    "execute_qledger_operation": "Atomically register records, a NEW journal, files and explicit links, with optional explicitly authorized posting. Existing records that may post need reviewed versions/hashes. Supply files as a list aligned with operation.attachments order. Never split the request into separate creates.",
     "list_qledger_records": "Find authorized records by parent, types and optional is_template flag. To find invoice templates, use types=invoice, is_template=true and the native unit parent. Relation is a caller-defined label. Paginate all matching templates before selecting the suitable family/version/date.",
     "delete_qledger_record": "Delete an eligible unposted parentless record with its current version; QLedger recursively cleans eligible children.",
     "copy_qledger_record": "Copy the specified reviewed source version into a new unlinked draft; requires source view and record:add.",
@@ -196,11 +218,25 @@ def build_qledger_server(settings: Settings) -> MCPServer:
                     open_world_hint=False,
                 ),
                 meta={
+                    **(
+                        {"openai/fileParams": ["file"]}
+                        if name == "upload_qledger_attachment"
+                        else {"openai/fileParams": ["files"]}
+                        if name == "execute_qledger_operation"
+                        else {}
+                    ),
                     "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
                     "openai/toolInvocation/invoking": title,
                     "openai/toolInvocation/invoked": title + " complete",
                 },
             )(getattr(module, name))
+
+            # MCP 2.0 builds an outer Pydantic argument model. Its error
+            # formatting, rather than FileInput's repr/config, governs nested
+            # validation failures and otherwise echoes complete signed URLs.
+            argument_model = server._tool_manager.get_tool(name).fn_metadata.arg_model
+            argument_model.model_config["hide_input_in_errors"] = True
+            argument_model.model_rebuild(force=True)
 
     @server.resource(
         "qledger://units/{unit_id}/attachments/{attachment_id}",

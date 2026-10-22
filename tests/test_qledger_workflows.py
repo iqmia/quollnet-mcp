@@ -143,7 +143,7 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         init["result"]["serverInfo"]["name"], "qledger-mcp"
                     )
                     tools = await rpc("tools/list", {})
-                    self.assertEqual(len(tools["result"]["tools"]), 51)
+                    self.assertEqual(len(tools["result"]["tools"]), 56)
                     results = await asyncio.gather(
                         rpc(
                             "tools/call",

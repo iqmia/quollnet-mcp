@@ -35,6 +35,7 @@ class QledgerAttachmentTests(unittest.IsolatedAsyncioTestCase):
         async with client(handler) as c:
             with ExitStack() as s:
                 s.enter_context(patch.object(t, "qledger_client", c))
+                s.enter_context(patch.object(t, "download_file", return_value=("invoice.pdf", b"pdf", "application/pdf")))
                 s.enter_context(patch.object(files, "qledger_client", c))
                 s.enter_context(
                     patch(
@@ -55,7 +56,7 @@ class QledgerAttachmentTests(unittest.IsolatedAsyncioTestCase):
                 await t.upload_qledger_attachment(
                     U,
                     target,
-                    FileInput(filename="invoice.pdf", file_base64="cGRm"),
+                    FileInput(filename="invoice.pdf", download_url="https://files.oaiusercontent.com/original", file_id="file_1"),
                     "k",
                 )
                 self.assertIn(b'name="linked_to_object"', seen[-1].content)

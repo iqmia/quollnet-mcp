@@ -5,27 +5,6 @@ from tests.qledger_support import U, A, client
 
 
 class QledgerFileTests(unittest.IsolatedAsyncioTestCase):
-    def test_strict_decode_and_bounds(self):
-        from quollnet_mcp.qledger.files import decode_file
-        from quollnet_mcp.qledger.models import FileInput
-
-        f = FileInput(
-            filename="invoice.pdf", content_type="application/pdf", file_base64="cGRm"
-        )
-        self.assertEqual(
-            decode_file(f, max_bytes=3), ("invoice.pdf", b"pdf", "application/pdf")
-        )
-        for bad in ["!!!", "data:application/pdf;base64,cGRm", "a", ""]:
-            with self.subTest(bad=bad), self.assertRaises(ValueError):
-                decode_file(
-                    FileInput(filename="invoice.pdf", file_base64=bad), max_bytes=3
-                )
-        with self.assertRaises(ValueError):
-            decode_file(f, max_bytes=2)
-        for name in ["../invoice.pdf", "a/b", "a\\b", "\r\nfile", ".", ".."]:
-            with self.assertRaises(ValueError):
-                decode_file(FileInput(filename=name, file_base64="cGRm"), max_bytes=3)
-
     async def test_authenticated_uncached_resource_and_stream_limit(self):
         from quollnet_mcp.qledger import files
         from quollnet_mcp.qledger.qledger_client import QledgerClientError

@@ -64,16 +64,16 @@ class QledgerOperationTests(unittest.IsolatedAsyncioTestCase):
                 ],
             }
         )
-        files = {
-            "invoice_file": FileInput(
+        files = [FileInput(
                 filename="original.pdf",
-                file_base64="cGRm",
-                content_type="application/pdf",
-            )
-        }
+                download_url="https://files.oaiusercontent.com/original",
+                file_id="file_1",
+                mime_type="application/pdf",
+            )]
         async with client(handler) as c:
             with (
                 patch.object(t, "qledger_client", c),
+                patch.object(t, "download_file", return_value=("original.pdf", b"pdf", "application/pdf")),
                 patch.object(t.auth, "unit_token", return_value="unit"),
             ):
                 first = await t.execute_qledger_operation(U, op, "stable-key", files)
@@ -125,10 +125,10 @@ class QledgerOperationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(seen[-1].headers["content-type"], "application/json")
                 self.assertIs(json.loads(seen[-1].content)["post_journal"], False)
                 before = len(seen)
-                for bad in [None, {}, {"extra": files["invoice_file"]}]:
+                for bad in [None, [], files + files]:
                     with self.assertRaises(ValueError):
                         await t.execute_qledger_operation(U, op, "key", bad)
                 self.assertEqual(len(seen), before)
                 c.settings = replace(c.settings, qledger_max_batch_file_bytes=2)
-                with self.assertRaises(ValueError):
+                with patch.object(t, "download_file", side_effect=ValueError("File exceeds the configured transfer limit")), self.assertRaises(ValueError):
                     await t.execute_qledger_operation(U, op, "key", files)

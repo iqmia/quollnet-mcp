@@ -52,7 +52,7 @@ class QledgerPdfTests(unittest.IsolatedAsyncioTestCase):
                     U,
                     R,
                     PdfRenderRequest(
-                        version=3, save_to_record=True, filename="invoice.pdf"
+                        version=3, save_to_record=True, filename="invoice.pdf", response_mode="binary"
                     ),
                     idempotency_key="stable-pdf-key",
                 )
