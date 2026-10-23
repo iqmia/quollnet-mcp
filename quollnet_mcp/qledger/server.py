@@ -26,7 +26,7 @@ from quollnet_mcp.qledger.tools import (
 )
 
 _GROUPS = (
-    (qledger_auth, ("logout_qledger",)),
+    (qledger_auth, ("get_qledger_profile",)),
     (
         units,
         (
@@ -136,7 +136,7 @@ _KEYED = {
     "execute_qledger_operation",
 }
 _DESCRIPTIONS = {
-    "logout_qledger": "Experimental reauthentication: clear cached QEntries tokens and return a tool-level OAuth authentication challenge to ChatGPT. Does not revoke the existing OAuth bearer. Requires explicit user request. CashflowPot is unaffected.",
+    "get_qledger_profile": "Identify the QAuth user represented by this authenticated ChatGPT connection. Read-only and requires no unit ID. Returns a stable user ID plus available display name/email; never takes a user selector.",
     "get_qledger_document_design_guidance": "Read advisory document design guidance before creating or changing templates: typography, headers/logos, neutral Issued By/To blocks, tables, totals, spacing, images and issuance snapshots. User preferences override defaults. Set include_schema=true for the native QTypeset v2 contract when designing an unfamiliar layout.",
     "render_qledger_record_pdf": "Render a DRAFT preview of the exact reviewed QEntries record through QTypeset, including posted records. Read design guidance first. Complete native v2 input belongs in record.data.rendering; bind images to authorized attachment IDs. save_to_record=true saves a draft_pdf and requires a stable idempotency_key; its default response_mode=metadata returns URLs without transferring bytes. Unsaved previews default to binary. This never issues or posts. Use issue_qledger_record for final issuance and preserved attachments for historical copies.",
     "get_qledger_issued_document": "Retrieve metadata for the preserved issued PDF and its current verification status, protected_url and verification_url months later. Does not regenerate or transfer binary content.",
@@ -229,6 +229,7 @@ def build_qledger_server(settings: Settings) -> MCPServer:
                         else {}
                     ),
                     "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
+                    **({"openai/profile": True} if name == "get_qledger_profile" else {}),
                     "openai/toolInvocation/invoking": title,
                     "openai/toolInvocation/invoked": title + " complete",
                 },
