@@ -15,7 +15,6 @@ from weakref import WeakKeyDictionary
 
 import jwt
 
-from .revocation import is_revoked
 
 _MAX_CONNECTIONS = 2048
 _MAX_LIFETIME = 3600
@@ -86,8 +85,6 @@ async def _refresh(token: str, callback: Callable[[str], Awaitable[str]]) -> str
 def _connection(access, app_id: str) -> tuple[str, float]:
     if access is None or not access.token or not access.subject:
         raise ValueError("Authentication is required")
-    if is_revoked(access.token):
-        raise ValueError("QLedger is logged out. Reconnect to sign in again.")
     now = time()
     expires = getattr(access, "expires_at", None)
     valid_until = min(float(expires) if expires is not None else now + _MAX_LIFETIME, now + _MAX_LIFETIME)
@@ -114,15 +111,10 @@ async def user_token(
             token = await exchange()
             if not token:
                 raise ValueError("QAuth returned no QEntries application token")
-            # Logout may occur while a network exchange is in progress.
-            if is_revoked(access.token):
-                raise ValueError("QLedger is logged out. Reconnect.")
             entry = _Entry(access.subject, app_id, valid_until, token)
             _entries[key] = entry
         else:
             entry.user_token = await _refresh(entry.user_token, refresh)
-            if is_revoked(access.token):
-                raise ValueError("QLedger is logged out. Reconnect.")
         _entries.move_to_end(key)
         _prune(time())
         return entry.user_token
@@ -149,8 +141,6 @@ async def unit_token(
                 raise ValueError("QEntries returned no unit token")
         else:
             token = await _refresh(token, refresh)
-        if is_revoked(access.token):
-            raise ValueError("QLedger is logged out. Reconnect.")
         entry.unit_tokens[unit_id] = token
         _entries.move_to_end(key)
         return token
