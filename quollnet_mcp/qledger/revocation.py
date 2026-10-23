@@ -6,6 +6,7 @@ must use the same QLEDGER_LOGOUT_DB_PATH on persistent shared storage.
 
 import os
 import sqlite3
+from contextlib import closing
 from hashlib import sha256
 from pathlib import Path
 from time import time
@@ -42,7 +43,7 @@ def _fingerprint(token: str) -> str:
 
 
 def is_revoked(token: str) -> bool:
-    with _connect() as conn:
+    with closing(_connect()) as conn:
         return conn.execute(
             "SELECT 1 FROM qledger_revoked WHERE fingerprint=? AND expires_at>?",
             (_fingerprint(token), int(time())),
@@ -51,12 +52,13 @@ def is_revoked(token: str) -> bool:
 
 def revoke(token: str, expires_at: int) -> None:
     now = int(time())
-    with _connect() as conn:
-        conn.execute("DELETE FROM qledger_revoked WHERE expires_at<=?", (now,))
-        conn.execute(
-            "INSERT OR REPLACE INTO qledger_revoked(fingerprint, expires_at) VALUES (?, ?)",
-            (_fingerprint(token), max(int(expires_at), now + 1)),
-        )
+    with closing(_connect()) as conn:
+        with conn:
+            conn.execute("DELETE FROM qledger_revoked WHERE expires_at<=?", (now,))
+            conn.execute(
+                "INSERT OR REPLACE INTO qledger_revoked(fingerprint, expires_at) VALUES (?, ?)",
+                (_fingerprint(token), max(int(expires_at), now + 1)),
+            )
 
 
 class QLedgerTokenVerifier(QAuthTokenVerifier):
