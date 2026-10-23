@@ -178,8 +178,6 @@ QLEDGER_MCP_RESOURCE_URI=https://mcp.quollnet.com/qledger
 QLEDGER_TIMEOUT_SECONDS=30
 QLEDGER_MAX_FILE_BYTES=10485760
 QLEDGER_MAX_BATCH_FILE_BYTES=20971520
-# Recommended: writable persistent path shared by all MCP workers
-QLEDGER_LOGOUT_DB_PATH=/var/lib/quollnet-mcp/qledger-logout.sqlite3
 ```
 
 The base URL can include the backend's deployment path prefix; the adapter appends
@@ -203,17 +201,21 @@ token exchange). Expiring application/unit tokens are refreshed through the
 QEntries `/api/auth/refresh` backend endpoint. No mutation is automatically
 retried following an authentication or transport error.
 
-`logout_qledger` revokes only that connection's /qledger OAuth bearer and
-removes its cached QEntries tokens. The verifier checks the revoked fingerprint
-on every request, including MCP resource reads. The logout SQLite database
-survives restarts and must be writable by the service user and located on shared
-persistent storage if workers/replicas use different filesystems. Ensure the
-directory is created and service-writable before deployment. If omitted, the
-path defaults to `$XDG_STATE_HOME/quollnet-mcp/qledger-logout.sqlite3` (or
-`~/.local/state/quollnet-mcp/qledger-logout.sqlite3`). After logout ChatGPT
-may still display the connection until manually disconnected. Disconnect and
-reconnect QLedger to authenticate again; to change user, sign out of any old
-QAuth browser session first. QAuth currently issues no MCP refresh grants.
+This experimental branch implements `logout_qledger` by clearing cached
+QEntries application/unit tokens and returning a tool error carrying
+`_meta["mcp/www_authenticate"]`, a Bearer challenge pointing to
+`/.well-known/oauth-protected-resource/qledger`. The QLedger verifier is
+unchanged: no blacklist database is used. The error shape can be tested through
+the MCP transport, but **only an actual ChatGPT OAuth interaction can establish
+whether ChatGPT prompts for authentication on an already-linked connection**.
+
+IMPORTANT: The original MCP JWT remains valid until expiry. If ChatGPT ignores
+the challenge and resends that JWT, QAuth can exchange it again and restore
+QEntries access. Therefore **this is not a secure logout** unless live testing
+shows the requested account-switch behavior and the intended threat model
+does not require immediate bearer revocation. The alternative strict logout
+implementation is preserved in `fallback/qledger-persistent-logout`.
+Do not deploy this branch as a verified logout without live testing.
 
 QEntries validates signed token permissions locally (including invalidation
 markers), while QAuth owns the initial exchange and unit/member administration.
