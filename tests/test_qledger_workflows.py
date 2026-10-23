@@ -175,6 +175,9 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                     )
                     tools = await rpc("tools/list", {})
                     self.assertEqual(len(tools["result"]["tools"]), 57)
+                    profiles = [tool for tool in tools["result"]["tools"] if tool.get("_meta", {}).get("openai/profile") is True]
+                    self.assertEqual([tool["name"] for tool in profiles], ["get_qledger_profile"])
+
                     results = await asyncio.gather(
                         rpc(
                             "tools/call",
@@ -209,22 +212,29 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         {"uri": f"qledger://units/{U}/attachments/{A}"},
                     )
                     self.assertEqual(resource["result"]["contents"][0]["blob"], "cGRm")
-                    logout = await rpc(
-                        "tools/call", {"name": "logout_qledger", "arguments": {}}
+                    profile_alice = await rpc(
+                        "tools/call", {"name": "get_qledger_profile", "arguments": {}}, user="one"
                     )
-                    self.assertTrue(logout["result"].get("isError"), logout)
-                    auth_challenge = logout["result"]["_meta"]["mcp/www_authenticate"][0]
-                    self.assertIn('error="invalid_token"', auth_challenge)
-                    self.assertIn(
-                        'resource_metadata="https://mcp.quollnet.com/.well-known/oauth-protected-resource/qledger"',
-                        auth_challenge,
+                    profile_bob = await rpc(
+                        "tools/call", {"name": "get_qledger_profile", "arguments": {}}, user="two"
                     )
-                    # No blacklist in this experiment: a still-valid OAuth bearer
-                    # remains valid. Actual ChatGPT relinking must be tested live.
-                    still_authenticated = await rpc("tools/list", {}, user="one")
-                    self.assertIn("tools", still_authenticated["result"])
-                    other_user = await rpc("tools/list", {}, user="two")
-                    self.assertIn("tools", other_user["result"])
+                    self.assertEqual(profile_alice["result"]["structuredContent"]["id"], "one")
+                    self.assertEqual(profile_bob["result"]["structuredContent"]["id"], "two")
+                    self.assertFalse(profile_alice["result"].get("isError", False))
+                    self.assertFalse(profile_bob["result"].get("isError", False))
+                    profile_again = await rpc(
+                        "tools/call", {"name": "get_qledger_profile", "arguments": {}}, user="one"
+                    )
+                    self.assertEqual(
+                        profile_again["result"]["structuredContent"],
+                        profile_alice["result"]["structuredContent"],
+                    )
+                    self.assertNotEqual(
+                        profile_alice["result"]["structuredContent"]["id"],
+                        profile_bob["result"]["structuredContent"]["id"],
+                    )
+                    # Profile resolves from verified OAuth JWT, not QAuth exchange.
+                    self.assertEqual({e[0] for e in exchanges}, {"one", "two"})
                     cashflowpot = await c.post(
                         "/cashflowpot",
                         headers={
