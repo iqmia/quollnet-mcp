@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from hashlib import sha256
 from time import time
 from typing import Awaitable, Callable
+from weakref import WeakKeyDictionary
 
 import jwt
 
@@ -31,7 +32,19 @@ class _Entry:
 
 
 _entries: OrderedDict[str, _Entry] = OrderedDict()
-_lock = asyncio.Lock()
+_locks: WeakKeyDictionary = WeakKeyDictionary()
+
+
+def _loop_lock() -> asyncio.Lock:
+    """Keep async synchronization bound to its owning event loop."""
+    loop = asyncio.get_running_loop()
+    lock = _locks.get(loop)
+    if lock is None:
+        lock = asyncio.Lock()
+        _locks[loop] = lock
+    return lock
+
+
 _current: ContextVar[tuple[str, str, str] | None] = ContextVar(
     "qledger_connection", default=None
 )
@@ -92,7 +105,7 @@ async def user_token(
     refresh: Callable[[str], Awaitable[str]],
 ) -> str:
     key, valid_until = _connection(access, app_id)
-    async with _lock:
+    async with _loop_lock():
         _prune(time())
         entry = _entries.get(key)
         if entry is not None and (entry.subject != access.subject or entry.app_id != app_id):
@@ -125,7 +138,7 @@ async def unit_token(
 ) -> str:
     await user_token(access, app_id, exchange, refresh)
     key, _ = _connection(access, app_id)
-    async with _lock:
+    async with _loop_lock():
         entry = _entries.get(key)
         if entry is None:
             raise ValueError("QLedger session expired")
@@ -148,7 +161,7 @@ async def remember_unit_token(token: str, unit_id: str) -> None:
     if connection is None:
         return
     key, subject, app_id = connection
-    async with _lock:
+    async with _loop_lock():
         entry = _entries.get(key)
         if entry and entry.subject == subject and entry.app_id == app_id and entry.valid_until > time():
             entry.unit_tokens[unit_id] = token
@@ -156,5 +169,5 @@ async def remember_unit_token(token: str, unit_id: str) -> None:
 
 
 async def forget(oauth_token: str) -> None:
-    async with _lock:
+    async with _loop_lock():
         _entries.pop(_key(oauth_token), None)
