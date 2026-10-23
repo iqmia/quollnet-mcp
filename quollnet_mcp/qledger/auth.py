@@ -1,21 +1,46 @@
-"""QLedger-only application credentials and experimental OAuth challenge.
+"""QLedger application credentials scoped to authenticated ChatGPT connections.
 
 The MCP OAuth token authenticates ChatGPT to this protected resource. Its sole
 application use is an initial QAuth exchange on a cache miss; QEntries then
 manages unit selection and token refresh.
 """
 
-from urllib.parse import urlsplit
 from uuid import UUID
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import CallToolResult, TextContent
+from typing import Annotated, NotRequired, TypedDict
+from pydantic import ConfigDict, Field
 
 from quollnet_mcp.dependencies import qauth_client, qledger_client
 from quollnet_mcp.services.qauth_client import QAuthClientError
 from quollnet_mcp.qledger.qledger_client import QledgerClientError
 from quollnet_mcp.qledger import token_store
+
+class QLedgerProfile(TypedDict):
+    """Authenticated stable profile for ChatGPT native multi-account support."""
+
+    __pydantic_config__ = ConfigDict(extra="forbid")
+
+    id: Annotated[str, Field(min_length=1, pattern=r"\\S")]
+    name: NotRequired[str]
+    email: NotRequired[str]
+
+
+def get_qledger_profile() -> QLedgerProfile:
+    """Return the account represented by THIS request's verified OAuth token.
+
+    No model-supplied account selection, token exchange, or QEntries call is
+    involved. QAuth user ID (sub) is stable across account reconnections.
+    """
+    access, _ = _identity()
+    claims = access.claims if isinstance(access.claims, dict) else {}
+    result: QLedgerProfile = {"id": access.subject}
+    for key in ("name", "email"):
+        value = claims.get(key)
+        if isinstance(value, str) and value.strip():
+            result[key] = value.strip()
+    return result
 
 
 def _identity():
@@ -95,36 +120,3 @@ async def unit_token(unit_id: UUID) -> str:
 async def remember_unit_token(token: str, unit_id: UUID) -> None:
     await token_store.remember_unit_token(token, str(UUID(str(unit_id))))
 
-
-async def logout_qledger() -> CallToolResult:
-    """Experimental: request OAuth UI without revoking the OAuth access token.
-
-    A valid bearer remains technically usable until it expires. This approach
-    is acceptable only if real ChatGPT reauthorization immediately replaces
-    the existing linked credential. The fallback branch performs strict logout.
-    """
-    access, _ = _identity()
-    await token_store.forget(access.token)
-
-    resource = urlsplit(qauth_client.settings.qledger_mcp_resource_uri)
-    if resource.scheme != "https" or not resource.netloc:
-        raise ToolError("QLedger OAuth resource metadata is not configured")
-    resource_metadata = (
-        f"{resource.scheme}://{resource.netloc}"
-        f"/.well-known/oauth-protected-resource{resource.path.rstrip('/')}"
-    )
-    challenge = (
-        f'Bearer resource_metadata="{resource_metadata}", '
-        'error="invalid_token", '
-        'error_description="QLedger user requested reauthentication"'
-    )
-    return CallToolResult(
-        content=[
-            TextContent(
-                type="text",
-                text="QLedger application tokens cleared. Reauthorize QLedger in ChatGPT.",
-            )
-        ],
-        is_error=True,
-        _meta={"mcp/www_authenticate": [challenge]},
-    )
