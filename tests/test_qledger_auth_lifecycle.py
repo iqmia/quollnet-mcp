@@ -49,7 +49,7 @@ class QLedgerSessionLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(requests), 2)
             self.assertEqual(len(exchanges), 1, "Unit changes must not exchange MCP token")
             self.assertEqual(
-                auth.get_qledger_profile(),
+                auth.get_qledger_profile().structured_content,
                 {"id": "alice", "name": "Alice", "email": "alice@example.test"},
             )
             self.assertEqual(len(exchanges), 1, "Profile must not trigger QAuth exchange")
@@ -106,7 +106,7 @@ class QLedgerSessionLifecycleTests(unittest.IsolatedAsyncioTestCase):
             patch.object(auth, "get_access_token", return_value=bearer),
             patch.object(auth, "qauth_client", SimpleNamespace(settings=settings())),
         ):
-            self.assertEqual(auth.get_qledger_profile(), {"id": "stable-id"})
+            self.assertEqual(auth.get_qledger_profile().structured_content, {"id": "stable-id"})
 
         server = build_qledger_server(settings())
         tool = next(t for t in await server.list_tools() if t.name == "get_qledger_profile")
