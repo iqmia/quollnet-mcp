@@ -212,16 +212,17 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                     logout = await rpc(
                         "tools/call", {"name": "logout_qledger", "arguments": {}}
                     )
-                    self.assertFalse(logout["result"].get("isError"), logout)
-                    revoked = await c.post(
-                        "/qledger",
-                        headers={
-                            "Authorization": "Bearer " + token("one"),
-                            "Accept": "application/json, text/event-stream",
-                        },
-                        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                    self.assertTrue(logout["result"].get("isError"), logout)
+                    auth_challenge = logout["result"]["_meta"]["mcp/www_authenticate"][0]
+                    self.assertIn('error="invalid_token"', auth_challenge)
+                    self.assertIn(
+                        'resource_metadata="https://mcp.quollnet.com/.well-known/oauth-protected-resource/qledger"',
+                        auth_challenge,
                     )
-                    self.assertEqual(revoked.status_code, 401)
+                    # No blacklist in this experiment: a still-valid OAuth bearer
+                    # remains valid. Actual ChatGPT relinking must be tested live.
+                    still_authenticated = await rpc("tools/list", {}, user="one")
+                    self.assertIn("tools", still_authenticated["result"])
                     other_user = await rpc("tools/list", {}, user="two")
                     self.assertIn("tools", other_user["result"])
                     cashflowpot = await c.post(
