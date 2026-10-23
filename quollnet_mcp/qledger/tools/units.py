@@ -1,5 +1,4 @@
 from uuid import UUID
-from quollnet_mcp.qledger import auth
 from urllib.parse import quote
 from quollnet_mcp.dependencies import qledger_client
 from quollnet_mcp.qledger.models import UnitCreate, MemberInvite, MemberRoles, PageQuery
@@ -36,15 +35,11 @@ async def list_qledger_units(query: PageQuery = PageQuery()):
 
 async def create_qledger_unit(request: UnitCreate):
     result = await call(qledger_client, "POST", "/api/units", body=request)
-    if isinstance(result.get("token"), str):
-        await auth.remember_unit_token(result["token"], UUID(result["unit"]["id"]))
     return {"unit": _unit(result["unit"])}
 
 
 async def load_qledger_unit(unit_id: UUID):
     result = await call(qledger_client, "POST", unit_path(unit_id) + "/load")
-    if isinstance(result.get("token"), str):
-        await auth.remember_unit_token(result["token"], unit_id)
     return {
         "unit": _unit(result["unit"]),
         "parent": _unit(result.get("parent")),

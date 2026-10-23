@@ -163,7 +163,7 @@ remain authoritative after exchange.
 ## QLedger
 
 The same `combined_app:app` process can additionally serve the dedicated MCP at
-`https://mcp.quollnet.com/qledger`. It exposes 57 named tools for units/members,
+`https://mcp.quollnet.com/qledger`. It exposes 51 named tools for units/members,
 accounts/settings, transactions/reversals/posting, reports, records, shared
 attachments and atomic document registration. Existing `/mcp` and `/cashflowpot`
 tool sets remain separate.
@@ -178,8 +178,6 @@ QLEDGER_MCP_RESOURCE_URI=https://mcp.quollnet.com/qledger
 QLEDGER_TIMEOUT_SECONDS=30
 QLEDGER_MAX_FILE_BYTES=10485760
 QLEDGER_MAX_BATCH_FILE_BYTES=20971520
-# Recommended: writable persistent path shared by all MCP workers
-QLEDGER_LOGOUT_DB_PATH=/var/lib/quollnet-mcp/qledger-logout.sqlite3
 ```
 
 The base URL can include the backend's deployment path prefix; the adapter appends
@@ -195,28 +193,9 @@ and invite-only targets. Do not change those policies merely to make a failed
 connection succeed. The deployed QLedger API must include the approved records
 and shared-attachments implementation.
 
-The first call for each MCP OAuth access token exchanges it for an ordinary
-QEntries application token; subsequent calls reuse the in-memory user token.
-Unit creation/loading supplies a unit token from QEntries, which the MCP stores
-internally; accessing another unit loads it through QEntries (not another MCP
-token exchange). Expiring application/unit tokens are refreshed through the
-QEntries `/api/auth/refresh` backend endpoint. No mutation is automatically
-retried following an authentication or transport error.
-
-`logout_qledger` revokes only that connection's /qledger OAuth bearer and
-removes its cached QEntries tokens. The verifier checks the revoked fingerprint
-on every request, including MCP resource reads. The logout SQLite database
-survives restarts and must be writable by the service user and located on shared
-persistent storage if workers/replicas use different filesystems. Ensure the
-directory is created and service-writable before deployment. If omitted, the
-path defaults to `$XDG_STATE_HOME/quollnet-mcp/qledger-logout.sqlite3` (or
-`~/.local/state/quollnet-mcp/qledger-logout.sqlite3`). After logout ChatGPT
-may still display the connection until manually disconnected. Disconnect and
-reconnect QLedger to authenticate again; to change user, sign out of any old
-QAuth browser session first. QAuth currently issues no MCP refresh grants.
-
-QEntries validates signed token permissions locally (including invalidation
-markers), while QAuth owns the initial exchange and unit/member administration.
+The connected MCP identity is exchanged for normal QLedger application/unit
+tokens. QLedger validates signed token permissions locally (including local
+invalidation markers); QAuth owns token exchange and unit/member administration.
 No admin credential or model-supplied token is used. Every unit tool has an
 explicit unit_id, and token-bearing unit responses are sanitized.
 

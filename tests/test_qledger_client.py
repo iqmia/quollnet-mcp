@@ -77,9 +77,6 @@ class QledgerClientTests(unittest.IsolatedAsyncioTestCase):
 
         qauth = SimpleNamespace(settings=settings(), exchange_app_token=exchange)
 
-        async def load(_token, unit_id):
-            return 'one:' + unit_id if unit_id == U else 'two:' + unit_id
-
         async def run(user, unit):
             identity.set(SimpleNamespace(token=user, subject=user))
             return await auth.unit_token(unit)
@@ -89,7 +86,6 @@ class QledgerClientTests(unittest.IsolatedAsyncioTestCase):
                 auth, "get_access_token", side_effect=lambda: identity.get(None)
             ),
             patch.object(auth, "qauth_client", qauth),
-            patch.object(auth, "_load", side_effect=load),
         ):
             result = await asyncio.gather(
                 run("one", U), run("two", "22222222-2222-4222-8222-222222222222")

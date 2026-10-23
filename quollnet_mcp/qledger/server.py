@@ -6,8 +6,7 @@ from mcp.server import MCPServer
 from mcp.server.auth.settings import AuthSettings
 from mcp.types import ToolAnnotations
 
-from quollnet_mcp.qledger.revocation import QLedgerTokenVerifier
-from quollnet_mcp.qledger import auth as qledger_auth
+from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import Settings
 from quollnet_mcp.qledger.files import attachment_resource
 from quollnet_mcp.qledger.instructions import QLEDGER_INSTRUCTIONS
@@ -26,7 +25,6 @@ from quollnet_mcp.qledger.tools import (
 )
 
 _GROUPS = (
-    (qledger_auth, ("logout_qledger",)),
     (
         units,
         (
@@ -136,7 +134,6 @@ _KEYED = {
     "execute_qledger_operation",
 }
 _DESCRIPTIONS = {
-    "logout_qledger": "End this QLedger MCP authorization and discard its application tokens. Requires explicit user instruction. Other MCP resources, including CashflowPot, are unaffected. Reconnect QLedger in ChatGPT to authenticate again.",
     "get_qledger_document_design_guidance": "Read advisory document design guidance before creating or changing templates: typography, headers/logos, neutral Issued By/To blocks, tables, totals, spacing, images and issuance snapshots. User preferences override defaults. Set include_schema=true for the native QTypeset v2 contract when designing an unfamiliar layout.",
     "render_qledger_record_pdf": "Render a DRAFT preview of the exact reviewed QEntries record through QTypeset, including posted records. Read design guidance first. Complete native v2 input belongs in record.data.rendering; bind images to authorized attachment IDs. save_to_record=true saves a draft_pdf and requires a stable idempotency_key; its default response_mode=metadata returns URLs without transferring bytes. Unsaved previews default to binary. This never issues or posts. Use issue_qledger_record for final issuance and preserved attachments for historical copies.",
     "get_qledger_issued_document": "Retrieve metadata for the preserved issued PDF and its current verification status, protected_url and verification_url months later. Does not regenerate or transfer binary content.",
@@ -176,7 +173,7 @@ def build_qledger_server(settings: Settings) -> MCPServer:
         "qledger-mcp",
         version=settings.service_version,
         instructions=QLEDGER_INSTRUCTIONS,
-        token_verifier=QLedgerTokenVerifier(
+        token_verifier=QAuthTokenVerifier(
             issuer_url=settings.qauth_issuer_url,
             resource_uri=settings.qledger_mcp_resource_uri,
             app_id=settings.qauth_app_id,

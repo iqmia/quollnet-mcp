@@ -15,21 +15,20 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
         server = build_qledger_server(settings())
         tools = await server.list_tools()
         names = {t.name for t in tools}
-        self.assertEqual(len(names), 57)
+        self.assertEqual(len(names), 56)
         for required in [
             "execute_qledger_operation",
             "post_qledger_transaction",
             "unpost_qledger_record",
             "download_qledger_attachment",
             "invite_qledger_member",
-            "logout_qledger",
         ]:
             self.assertIn(required, names)
         self.assertFalse(names & {t.name for t in await mcp.list_tools()})
         self.assertFalse(names & {t.name for t in await cashflowpot_mcp.list_tools()})
         for t in tools:
             self.assertIn("securitySchemes", t.meta)
-            if t.name not in ["list_qledger_units", "create_qledger_unit", "logout_qledger"]:
+            if t.name not in ["list_qledger_units", "create_qledger_unit"]:
                 self.assertIn("unit_id", t.input_schema["required"])
         post = next(t for t in tools if t.name == "post_qledger_transaction")
         self.assertTrue(post.annotations.destructive_hint)

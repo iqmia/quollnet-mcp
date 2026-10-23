@@ -1,5 +1,5 @@
 QLEDGER_INSTRUCTIONS = """
-Only call logout_qledger when the user explicitly requests logout; this revokes the\ncurrent QLedger MCP bearer and its cached QEntries tokens. After logout, guide\nthe user to disconnect and reconnect QLedger in ChatGPT. Do not continue work\nusing another identity or assume CashflowPot was logged out.\n\nQLedger is authoritative for permissions, accounting validation, balances, posting,
+QLedger is authoritative for permissions, accounting validation, balances, posting,
 records, attachment access and cleanup. Act through the connected user's account;
 never infer permission from a role name or try an elevated identity after a denial.
 Discover units, then use explicit unit_id on every unit tool. Admin manages access;
