@@ -1,22 +1,21 @@
-"""QLedger-only application credentials and logout.
+"""QLedger-only application credentials and experimental OAuth challenge.
 
 The MCP OAuth token authenticates ChatGPT to this protected resource. Its sole
 application use is an initial QAuth exchange on a cache miss; QEntries then
 manages unit selection and token refresh.
 """
 
-import sqlite3
-from time import time
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import CallToolResult, TextContent
 
 from quollnet_mcp.dependencies import qauth_client, qledger_client
 from quollnet_mcp.services.qauth_client import QAuthClientError
 from quollnet_mcp.qledger.qledger_client import QledgerClientError
 from quollnet_mcp.qledger import token_store
-from quollnet_mcp.qledger.revocation import revoke
 
 
 def _identity():
@@ -75,7 +74,7 @@ async def application_token() -> str:
             exchange=lambda: _exchange(access, app_id),
             refresh=_refresh,
         )
-    except (ValueError, QAuthClientError, QledgerClientError, OSError, sqlite3.Error) as error:
+    except (ValueError, QAuthClientError, QledgerClientError) as error:
         _tool_error(error)
 
 
@@ -89,7 +88,7 @@ async def unit_token(unit_id: UUID) -> str:
             refresh=_refresh,
             load=_load,
         )
-    except (ValueError, QAuthClientError, QledgerClientError, OSError, sqlite3.Error) as error:
+    except (ValueError, QAuthClientError, QledgerClientError) as error:
         _tool_error(error)
 
 
@@ -97,22 +96,35 @@ async def remember_unit_token(token: str, unit_id: UUID) -> None:
     await token_store.remember_unit_token(token, str(UUID(str(unit_id))))
 
 
-async def logout_qledger() -> dict:
-    """Terminate only this /qledger OAuth bearer; reconnect to authenticate again."""
+async def logout_qledger() -> CallToolResult:
+    """Experimental: request OAuth UI without revoking the OAuth access token.
+
+    A valid bearer remains technically usable until it expires. This approach
+    is acceptable only if real ChatGPT reauthorization immediately replaces
+    the existing linked credential. The fallback branch performs strict logout.
+    """
     access, _ = _identity()
-    try:
-        expiry = getattr(access, "expires_at", None)
-        revoke(access.token, int(expiry) if expiry is not None else int(time()) + 3600)
-        await token_store.forget(access.token)
-    except (OSError, sqlite3.Error, ValueError):
-        raise ToolError(
-            "QLedger logout could not be safely completed. Disconnect the plugin manually."
-        ) from None
-    return {
-        "logged_out": True,
-        "message": (
-            "QLedger authorization was revoked for this access token. "
-            "Disconnect and reconnect QLedger in ChatGPT to sign in again. "
-            "CashflowPot and other MCP connections are unchanged."
-        ),
-    }
+    await token_store.forget(access.token)
+
+    resource = urlsplit(qauth_client.settings.qledger_mcp_resource_uri)
+    if resource.scheme != "https" or not resource.netloc:
+        raise ToolError("QLedger OAuth resource metadata is not configured")
+    resource_metadata = (
+        f"{resource.scheme}://{resource.netloc}"
+        f"/.well-known/oauth-protected-resource{resource.path.rstrip('/')}"
+    )
+    challenge = (
+        f'Bearer resource_metadata="{resource_metadata}", '
+        'error="invalid_token", '
+        'error_description="QLedger user requested reauthentication"'
+    )
+    return CallToolResult(
+        content=[
+            TextContent(
+                type="text",
+                text="QLedger application tokens cleared. Reauthorize QLedger in ChatGPT.",
+            )
+        ],
+        is_error=True,
+        _meta={"mcp/www_authenticate": [challenge]},
+    )
