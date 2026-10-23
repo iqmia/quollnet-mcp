@@ -11,12 +11,12 @@ from tests.qledger_support import U, E, settings
 
 
 class QLedgerSessionLifecycleTests(unittest.IsolatedAsyncioTestCase):
-    async def test_exchange_only_once_unit_switching_and_logout(self):
+    async def test_exchange_once_unit_switching_and_separate_profiles(self):
         from quollnet_mcp.qledger import auth
 
         connected = ContextVar("mcp_test_current_identity")
-        first = SimpleNamespace(token="unique-ql-oauth-a", subject="alice", expires_at=int(time.time()) + 1500)
-        second = SimpleNamespace(token="unique-ql-oauth-b", subject="bob", expires_at=int(time.time()) + 1500)
+        first = SimpleNamespace(token="unique-ql-oauth-a", subject="alice", claims={"name": "Alice", "email": "alice@example.test"}, expires_at=int(time.time()) + 1500)
+        second = SimpleNamespace(token="unique-ql-oauth-b", subject="bob", claims={"name": "Bob", "email": "bob@example.test"}, expires_at=int(time.time()) + 1500)
         connected.set(first)
         exchanges = []
         requests = []
@@ -48,22 +48,22 @@ class QLedgerSessionLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await auth.unit_token(E), first.token + ":" + E)
             self.assertEqual(len(requests), 2)
             self.assertEqual(len(exchanges), 1, "Unit changes must not exchange MCP token")
-            result = await auth.logout_qledger()
-            payload = result.model_dump(by_alias=True, exclude_none=True)
-            self.assertTrue(payload["isError"])
-            challenge = payload["_meta"]["mcp/www_authenticate"][0]
-            self.assertIn('error="invalid_token"', challenge)
-            self.assertIn(
-                'resource_metadata="https://mcp.quollnet.com/.well-known/oauth-protected-resource/qledger"',
-                challenge,
+            self.assertEqual(
+                auth.get_qledger_profile(),
+                {"id": "alice", "name": "Alice", "email": "alice@example.test"},
             )
-            # Challenge alone does not revoke the signed OAuth bearer. If ChatGPT
-            # ignores the linking UI, reusing the old bearer can recreate the session.
-            self.assertEqual(await auth.application_token(), first.token + ":application")
-            self.assertEqual(len(exchanges), 2)
+            self.assertEqual(len(exchanges), 1, "Profile must not trigger QAuth exchange")
             connected.set(second)
+            self.assertEqual(
+                auth.get_qledger_profile(),
+                {"id": "bob", "name": "Bob", "email": "bob@example.test"},
+            )
             self.assertEqual(await auth.application_token(), second.token + ":application")
-            self.assertEqual(len(exchanges), 3, "A new OAuth connection can authenticate")
+            self.assertEqual(len(exchanges), 2, "Another OAuth connection authenticates independently")
+            connected.set(first)
+            self.assertEqual(await auth.application_token(), first.token + ":application")
+            self.assertEqual(len(exchanges), 2, "Switching back reuses the original account cache")
+
 
     async def test_expiring_application_token_refreshes_using_qentries(self):
         from quollnet_mcp.qledger import auth
@@ -96,19 +96,23 @@ class QLedgerSessionLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(requests[0][2], first_jwt)
 
 
-    async def test_challenge_does_not_change_shared_verifier_or_cashflowpot(self):
-        from quollnet_mcp.auth import QAuthTokenVerifier
+    async def test_profile_validation_without_display_data_and_no_user_selector(self):
+        from quollnet_mcp.qledger import auth
         from quollnet_mcp.qledger.server import build_qledger_server
         from quollnet_mcp.cashflowpot.server import build_cashflowpot_server
 
-        self.assertEqual(
-            type(build_qledger_server(settings())._tool_manager.get_tool("logout_qledger").fn).__name__,
-            "function",
-        )
-        self.assertIsInstance(
-            build_qledger_server(settings())._token_verifier,
-            QAuthTokenVerifier,
-        ) if hasattr(build_qledger_server(settings()), "_token_verifier") else None
+        bearer = SimpleNamespace(token="unique-profile-1", subject="stable-id", claims={}, expires_at=int(time.time()) + 100)
+        with (
+            patch.object(auth, "get_access_token", return_value=bearer),
+            patch.object(auth, "qauth_client", SimpleNamespace(settings=settings())),
+        ):
+            self.assertEqual(auth.get_qledger_profile(), {"id": "stable-id"})
+
+        server = build_qledger_server(settings())
+        tool = next(t for t in await server.list_tools() if t.name == "get_qledger_profile")
+        self.assertEqual(tool.input_schema.get("properties"), {})
+        self.assertIs(tool.meta["openai/profile"], True)
+        self.assertTrue(tool.annotations.read_only_hint)
         self.assertIsNotNone(build_cashflowpot_server(settings()))
 
 
