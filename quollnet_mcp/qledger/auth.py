@@ -35,7 +35,7 @@ PROFILE_OUTPUT_SCHEMA = {
         "id": {
             "type": "string",
             "minLength": 1,
-            "pattern": r"\\S",
+            "pattern": r"\S",
             "description": "Stable QAuth user ID (OAuth subject).",
         },
         "name": {"type": "string"},
