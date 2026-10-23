@@ -22,7 +22,7 @@ class QLedgerProfile(TypedDict):
 
     __pydantic_config__ = ConfigDict(extra="forbid")
 
-    id: Annotated[str, Field(min_length=1, pattern=r"\\S")]
+    id: Annotated[str, Field(min_length=1, pattern=r"\S")]
     name: NotRequired[str]
     email: NotRequired[str]
 
