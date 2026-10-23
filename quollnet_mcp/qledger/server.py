@@ -7,6 +7,7 @@ from mcp.server.auth.settings import AuthSettings
 from mcp.types import ToolAnnotations
 
 from quollnet_mcp.auth import QAuthTokenVerifier
+from quollnet_mcp.qledger import auth as qledger_auth
 from quollnet_mcp.config import Settings
 from quollnet_mcp.qledger.files import attachment_resource
 from quollnet_mcp.qledger.instructions import QLEDGER_INSTRUCTIONS
@@ -25,6 +26,7 @@ from quollnet_mcp.qledger.tools import (
 )
 
 _GROUPS = (
+    (qledger_auth, ("get_qledger_profile",)),
     (
         units,
         (
@@ -134,6 +136,7 @@ _KEYED = {
     "execute_qledger_operation",
 }
 _DESCRIPTIONS = {
+    "get_qledger_profile": "Identify the QAuth user represented by this authenticated ChatGPT connection. Read-only and requires no unit ID. Returns a stable user ID plus available display name/email; never takes a user selector.",
     "get_qledger_document_design_guidance": "Read advisory document design guidance before creating or changing templates: typography, headers/logos, neutral Issued By/To blocks, tables, totals, spacing, images and issuance snapshots. User preferences override defaults. Set include_schema=true for the native QTypeset v2 contract when designing an unfamiliar layout.",
     "render_qledger_record_pdf": "Render a DRAFT preview of the exact reviewed QEntries record through QTypeset, including posted records. Read design guidance first. Complete native v2 input belongs in record.data.rendering; bind images to authorized attachment IDs. save_to_record=true saves a draft_pdf and requires a stable idempotency_key; its default response_mode=metadata returns URLs without transferring bytes. Unsaved previews default to binary. This never issues or posts. Use issue_qledger_record for final issuance and preserved attachments for historical copies.",
     "get_qledger_issued_document": "Retrieve metadata for the preserved issued PDF and its current verification status, protected_url and verification_url months later. Does not regenerate or transfer binary content.",
@@ -226,6 +229,7 @@ def build_qledger_server(settings: Settings) -> MCPServer:
                         else {}
                     ),
                     "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
+                    **({"openai/profile": True} if name == "get_qledger_profile" else {}),
                     "openai/toolInvocation/invoking": title,
                     "openai/toolInvocation/invoked": title + " complete",
                 },
@@ -237,6 +241,14 @@ def build_qledger_server(settings: Settings) -> MCPServer:
             argument_model = server._tool_manager.get_tool(name).fn_metadata.arg_model
             argument_model.model_config["hide_input_in_errors"] = True
             argument_model.model_rebuild(force=True)
+
+            if name == "get_qledger_profile":
+                # Declare the exact ChatGPT profile schema and validate the
+                # explicit CallToolResult's structuredContent. The SDK's
+                # default optional-field serializer includes null values.
+                profile_metadata = server._tool_manager.get_tool(name).fn_metadata
+                profile_metadata.output_model = qledger_auth.QLedgerProfile
+                profile_metadata.output_schema = qledger_auth.PROFILE_OUTPUT_SCHEMA
 
     @server.resource(
         "qledger://units/{unit_id}/attachments/{attachment_id}",

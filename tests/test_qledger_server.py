@@ -15,21 +15,32 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
         server = build_qledger_server(settings())
         tools = await server.list_tools()
         names = {t.name for t in tools}
-        self.assertEqual(len(names), 56)
+        self.assertEqual(len(names), 57)
         for required in [
             "execute_qledger_operation",
             "post_qledger_transaction",
             "unpost_qledger_record",
             "download_qledger_attachment",
             "invite_qledger_member",
+            "get_qledger_profile",
         ]:
             self.assertIn(required, names)
         self.assertFalse(names & {t.name for t in await mcp.list_tools()})
         self.assertFalse(names & {t.name for t in await cashflowpot_mcp.list_tools()})
         for t in tools:
             self.assertIn("securitySchemes", t.meta)
-            if t.name not in ["list_qledger_units", "create_qledger_unit"]:
+            if t.name not in ["list_qledger_units", "create_qledger_unit", "get_qledger_profile"]:
                 self.assertIn("unit_id", t.input_schema["required"])
+        profile = next(t for t in tools if t.name == "get_qledger_profile")
+        self.assertTrue(profile.meta["openai/profile"])
+        self.assertTrue(profile.annotations.read_only_hint)
+        self.assertEqual(profile.input_schema["type"], "object")
+        self.assertFalse(profile.input_schema.get("required"))
+        self.assertEqual(profile.output_schema["type"], "object")
+        self.assertEqual(profile.output_schema["additionalProperties"], False)
+        self.assertEqual(profile.output_schema["required"], ["id"])
+        self.assertEqual(set(profile.output_schema["properties"]), {"id", "name", "email"})
+        self.assertEqual(sum(t.meta.get("openai/profile") is True for t in tools), 1)
         post = next(t for t in tools if t.name == "post_qledger_transaction")
         self.assertTrue(post.annotations.destructive_hint)
         self.assertFalse(post.annotations.read_only_hint)

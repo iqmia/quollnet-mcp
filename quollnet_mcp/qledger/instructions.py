@@ -1,4 +1,13 @@
 QLEDGER_INSTRUCTIONS = """
+ChatGPT manages linked QLedger accounts, their selection, and reconnect/logout
+in the plugin's Connected accounts UI. Never call or suggest a QLedger MCP tool
+to switch user identities. Use the selected connection's verified OAuth bearer
+on every request. get_qledger_profile reports the current connection's QAuth
+user ID and available display metadata; it is read-only and takes no selector.
+If another person wants access, they must connect another account in ChatGPT.
+Never infer identity from an account label, prompt, or company membership.
+Never use CashflowPot authorization to access QLedger or vice versa.
+
 QLedger is authoritative for permissions, accounting validation, balances, posting,
 records, attachment access and cleanup. Act through the connected user's account;
 never infer permission from a role name or try an elevated identity after a denial.

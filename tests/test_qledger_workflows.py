@@ -15,7 +15,10 @@ from tests.qledger_support import U, E, A, settings
 
 class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_authenticated_rpc_isolation_and_binary_resource(self):
+        import combined_app
         from combined_app import build_combined_app
+        from mcp.server.transport_security import TransportSecuritySettings
+        from quollnet_mcp.cashflowpot.server import build_cashflowpot_server
         from quollnet_mcp.dependencies import (
             qledger_client,
             qauth_client,
@@ -33,10 +36,27 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
             .decode()
         )
         configuration = replace(settings(), qauth_public_key=public)
+        # Give both independent protected resources the same test verification key.
+        # The module-level CashflowPot server normally uses environment settings.
+        test_cashflowpot = build_cashflowpot_server(configuration)
+        test_cashflowpot_app = test_cashflowpot.streamable_http_app(
+            streamable_http_path="/",
+            json_response=True,
+            stateless_http=True,
+            transport_security=TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=["mcp.quollnet.com", "mcp.quollnet.com:*"],
+                allowed_origins=["https://chatgpt.com"],
+            ),
+        )
+
+        minted_tokens = {}
 
         def token(user, audience="https://mcp.quollnet.com/qledger"):
+            if (user, audience) in minted_tokens:
+                return minted_tokens[(user, audience)]
             now = int(time.time())
-            return jwt.encode(
+            minted = jwt.encode(
                 {
                     "iss": configuration.qauth_issuer_url,
                     "sub": user,
@@ -53,6 +73,8 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 algorithm="RS256",
                 headers={"kid": configuration.qauth_app_id, "typ": "JWT"},
             )
+            minted_tokens[(user, audience)] = minted
+            return minted
 
         exchanges = []
         requests = []
@@ -78,6 +100,13 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 return httpx.Response(
                     200, content=b"pdf", headers={"content-type": "application/pdf"}
                 )
+            if req.url.path.endswith("/load"):
+                unit_id = req.url.path.split("/")[-2]
+                subject = req.headers["Authorization"].split(" ", 1)[1].split(":")[0]
+                return httpx.Response(
+                    200, json={"unit": {"id": unit_id}, "token": subject + ":" + unit_id,
+                               "parent": None, "children_page": []}
+                )
             return httpx.Response(
                 200, json={"items": [], "total": 0, "page": 1, "per_page": 50}
             )
@@ -95,6 +124,8 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
             transport=httpx.MockTransport(lambda r: httpx.Response(500))
         )
         with (
+            patch.object(combined_app, "cashflowpot_mcp", test_cashflowpot),
+            patch.object(combined_app, "_cashflowpot_http_app", test_cashflowpot_app),
             patch.object(qapp_client, "_client", unused_app),
             patch.object(qflow_client, "_client", unused_flow),
             patch.object(qauth_client, "settings", configuration),
@@ -143,7 +174,10 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         init["result"]["serverInfo"]["name"], "qledger-mcp"
                     )
                     tools = await rpc("tools/list", {})
-                    self.assertEqual(len(tools["result"]["tools"]), 56)
+                    self.assertEqual(len(tools["result"]["tools"]), 57)
+                    profiles = [tool for tool in tools["result"]["tools"] if tool.get("_meta", {}).get("openai/profile") is True]
+                    self.assertEqual([tool["name"] for tool in profiles], ["get_qledger_profile"])
+
                     results = await asyncio.gather(
                         rpc(
                             "tools/call",
@@ -167,7 +201,7 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         results,
                     )
                     self.assertEqual(
-                        {r.headers["Authorization"] for r in requests},
+                        {r.headers["Authorization"] for r in requests if not r.url.path.endswith("/load")},
                         {"Bearer one:" + U, "Bearer two:" + E},
                     )
                     self.assertEqual(
@@ -178,6 +212,41 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         {"uri": f"qledger://units/{U}/attachments/{A}"},
                     )
                     self.assertEqual(resource["result"]["contents"][0]["blob"], "cGRm")
+                    profile_alice = await rpc(
+                        "tools/call", {"name": "get_qledger_profile", "arguments": {}}, user="one"
+                    )
+                    profile_bob = await rpc(
+                        "tools/call", {"name": "get_qledger_profile", "arguments": {}}, user="two"
+                    )
+                    self.assertEqual(profile_alice["result"]["structuredContent"]["id"], "one")
+                    self.assertEqual(profile_bob["result"]["structuredContent"]["id"], "two")
+                    self.assertFalse(profile_alice["result"].get("isError", False))
+                    self.assertFalse(profile_bob["result"].get("isError", False))
+                    profile_again = await rpc(
+                        "tools/call", {"name": "get_qledger_profile", "arguments": {}}, user="one"
+                    )
+                    self.assertEqual(
+                        profile_again["result"]["structuredContent"],
+                        profile_alice["result"]["structuredContent"],
+                    )
+                    self.assertNotEqual(
+                        profile_alice["result"]["structuredContent"]["id"],
+                        profile_bob["result"]["structuredContent"]["id"],
+                    )
+                    # Profile resolves from verified OAuth JWT, not QAuth exchange.
+                    self.assertEqual({e[0] for e in exchanges}, {"one", "two"})
+                    cashflowpot = await c.post(
+                        "/cashflowpot",
+                        headers={
+                            "Authorization": "Bearer " + token(
+                                "one", "https://mcp.quollnet.com/cashflowpot"
+                            ),
+                            "Accept": "application/json, text/event-stream",
+                        },
+                        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                    )
+                    self.assertEqual(cashflowpot.status_code, 200, cashflowpot.text)
+                    self.assertIn("tools", cashflowpot.json()["result"])
                     before = len(exchanges)
                     bad = await c.post(
                         "/qledger",
