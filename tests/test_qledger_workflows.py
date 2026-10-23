@@ -34,9 +34,13 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
         )
         configuration = replace(settings(), qauth_public_key=public)
 
+        minted_tokens = {}
+
         def token(user, audience="https://mcp.quollnet.com/qledger"):
+            if (user, audience) in minted_tokens:
+                return minted_tokens[(user, audience)]
             now = int(time.time())
-            return jwt.encode(
+            minted = jwt.encode(
                 {
                     "iss": configuration.qauth_issuer_url,
                     "sub": user,
@@ -53,6 +57,8 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 algorithm="RS256",
                 headers={"kid": configuration.qauth_app_id, "typ": "JWT"},
             )
+            minted_tokens[(user, audience)] = minted
+            return minted
 
         exchanges = []
         requests = []
@@ -174,7 +180,7 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         results,
                     )
                     self.assertEqual(
-                        {r.headers["Authorization"] for r in requests},
+                        {r.headers["Authorization"] for r in requests if not r.url.path.endswith("/load")},
                         {"Bearer one:" + U, "Bearer two:" + E},
                     )
                     self.assertEqual(
@@ -185,6 +191,33 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         {"uri": f"qledger://units/{U}/attachments/{A}"},
                     )
                     self.assertEqual(resource["result"]["contents"][0]["blob"], "cGRm")
+                    logout = await rpc(
+                        "tools/call", {"name": "logout_qledger", "arguments": {}}
+                    )
+                    self.assertFalse(logout["result"].get("isError"), logout)
+                    revoked = await c.post(
+                        "/qledger",
+                        headers={
+                            "Authorization": "Bearer " + token("one"),
+                            "Accept": "application/json, text/event-stream",
+                        },
+                        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                    )
+                    self.assertEqual(revoked.status_code, 401)
+                    other_user = await rpc("tools/list", {}, user="two")
+                    self.assertIn("tools", other_user["result"])
+                    cashflowpot = await c.post(
+                        "/cashflowpot",
+                        headers={
+                            "Authorization": "Bearer " + token(
+                                "one", "https://mcp.quollnet.com/cashflowpot"
+                            ),
+                            "Accept": "application/json, text/event-stream",
+                        },
+                        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+                    )
+                    self.assertEqual(cashflowpot.status_code, 200, cashflowpot.text)
+                    self.assertIn("tools", cashflowpot.json()["result"])
                     before = len(exchanges)
                     bad = await c.post(
                         "/qledger",
