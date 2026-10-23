@@ -242,6 +242,13 @@ def build_qledger_server(settings: Settings) -> MCPServer:
             argument_model.model_config["hide_input_in_errors"] = True
             argument_model.model_rebuild(force=True)
 
+            if name == "get_qledger_profile":
+                # MCPServer 2.0 reconstructs TypedDict output schemas via
+                # create_model() and drops its extra='forbid' config. Advertise
+                # the exact closed profile object required by ChatGPT.
+                profile_schema = server._tool_manager.get_tool(name).fn_metadata.output_schema
+                profile_schema["additionalProperties"] = False
+
     @server.resource(
         "qledger://units/{unit_id}/attachments/{attachment_id}",
         name="qledger_attachment",
