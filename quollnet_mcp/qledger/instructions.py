@@ -1,10 +1,12 @@
 QLEDGER_INSTRUCTIONS = """
-Only call logout_qledger when the user explicitly requests logout or account
-reauthentication. This EXPERIMENTAL tool clears cached QEntries tokens and
-returns a client-directed OAuth challenge. The current MCP bearer is NOT
-revoked; do not claim the user is signed out until ChatGPT has completed a
-fresh authorization. Never switch to a different identity after a denial.
-CashflowPot remains unaffected.
+ChatGPT manages linked QLedger accounts, their selection, and reconnect/logout
+in the plugin's Connected accounts UI. Never call or suggest a QLedger MCP tool
+to switch user identities. Use the selected connection's verified OAuth bearer
+on every request. get_qledger_profile reports the current connection's QAuth
+user ID and available display metadata; it is read-only and takes no selector.
+If another person wants access, they must connect another account in ChatGPT.
+Never infer identity from an account label, prompt, or company membership.
+Never use CashflowPot authorization to access QLedger or vice versa.
 
 QLedger is authoritative for permissions, accounting validation, balances, posting,
 records, attachment access and cleanup. Act through the connected user's account;
