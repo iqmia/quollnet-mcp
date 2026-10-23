@@ -201,21 +201,34 @@ token exchange). Expiring application/unit tokens are refreshed through the
 QEntries `/api/auth/refresh` backend endpoint. No mutation is automatically
 retried following an authentication or transport error.
 
-This experimental branch implements `logout_qledger` by clearing cached
-QEntries application/unit tokens and returning a tool error carrying
-`_meta["mcp/www_authenticate"]`, a Bearer challenge pointing to
-`/.well-known/oauth-protected-resource/qledger`. The QLedger verifier is
-unchanged: no blacklist database is used. The error shape can be tested through
-the MCP transport, but **only an actual ChatGPT OAuth interaction can establish
-whether ChatGPT prompts for authentication on an already-linked connection**.
+### Connected QLedger accounts
 
-IMPORTANT: The original MCP JWT remains valid until expiry. If ChatGPT ignores
-the challenge and resends that JWT, QAuth can exchange it again and restore
-QEntries access. Therefore **this is not a secure logout** unless live testing
-shows the requested account-switch behavior and the intended threat model
-does not require immediate bearer revocation. The alternative strict logout
-implementation is preserved in `fallback/qledger-persistent-logout`.
-Do not deploy this branch as a verified logout without live testing.
+ChatGPT manages multiple OAuth-linked users for one plugin: select the
+appropriate connected account, or add another one through ChatGPT's plugin
+settings. Each request carries that selected connection's verified OAuth
+bearer; the QLedger MCP never chooses users or handles account switching.
+
+The authenticated, read-only `get_qledger_profile` tool is identified by
+`_meta["openai/profile"]=true`. It returns the immutable QAuth user ID
+(the validated OAuth `sub`) as `id`, plus `name` and `email` when available
+in the verified claims. Its declared output schema matches the OpenAI
+profile-tool schema and permits ChatGPT to label and deduplicate connections.
+It performs no backend token exchange.
+
+QAuth **already implements** `POST /oauth/exchange-token` for the backend
+conversion from a valid MCP OAuth bearer to a QEntries user token. The existing
+QLedger MCP client invokes that route automatically on first use (or a cache
+miss); it never opens a login page for token exchange. QEntries subsequently
+refreshes its own application/unit tokens with `/api/auth/refresh` as needed.
+OAuth authorization UI appears on ChatGPT's initial account connection, when
+adding another linked account, or during a reconnect/reauthorization required
+by the OAuth layer.
+
+This design has **no MCP logout tool, forced reauthentication challenge, or
+SQLite revocation list**. Users disconnect, reconnect, or switch their
+account through ChatGPT's built-in plugin Connected accounts controls.
+The fallback strict revocation approach remains isolated in
+`fallback/qledger-persistent-logout`.
 
 QEntries validates signed token permissions locally (including invalidation
 markers), while QAuth owns the initial exchange and unit/member administration.
