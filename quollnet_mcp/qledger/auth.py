@@ -18,6 +18,7 @@ from quollnet_mcp.services.qauth_client import QAuthClientError
 from quollnet_mcp.qledger.qledger_client import QledgerClientError
 from quollnet_mcp.qledger import token_store
 
+
 class QLedgerProfile(BaseModel):
     """Validate the identity returned to ChatGPT without inventing display data."""
 
@@ -64,6 +65,7 @@ def get_qledger_profile() -> CallToolResult:
         content=[TextContent(type="text", text=json.dumps(payload, separators=(",", ":")))],
         structured_content=payload,
     )
+
 
 def _identity():
     access = get_access_token()
