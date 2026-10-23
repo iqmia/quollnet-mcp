@@ -15,7 +15,10 @@ from tests.qledger_support import U, E, A, settings
 
 class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_authenticated_rpc_isolation_and_binary_resource(self):
+        import combined_app
         from combined_app import build_combined_app
+        from mcp.server.transport_security import TransportSecuritySettings
+        from quollnet_mcp.cashflowpot.server import build_cashflowpot_server
         from quollnet_mcp.dependencies import (
             qledger_client,
             qauth_client,
@@ -33,6 +36,19 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
             .decode()
         )
         configuration = replace(settings(), qauth_public_key=public)
+        # Give both independent protected resources the same test verification key.
+        # The module-level CashflowPot server normally uses environment settings.
+        test_cashflowpot = build_cashflowpot_server(configuration)
+        test_cashflowpot_app = test_cashflowpot.streamable_http_app(
+            streamable_http_path="/",
+            json_response=True,
+            stateless_http=True,
+            transport_security=TransportSecuritySettings(
+                enable_dns_rebinding_protection=True,
+                allowed_hosts=["mcp.quollnet.com", "mcp.quollnet.com:*"],
+                allowed_origins=["https://chatgpt.com"],
+            ),
+        )
 
         minted_tokens = {}
 
@@ -108,6 +124,8 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
             transport=httpx.MockTransport(lambda r: httpx.Response(500))
         )
         with (
+            patch.object(combined_app, "cashflowpot_mcp", test_cashflowpot),
+            patch.object(combined_app, "_cashflowpot_http_app", test_cashflowpot_app),
             patch.object(qapp_client, "_client", unused_app),
             patch.object(qflow_client, "_client", unused_flow),
             patch.object(qauth_client, "settings", configuration),
