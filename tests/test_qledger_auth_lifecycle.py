@@ -55,7 +55,7 @@ class QLedgerSessionLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(exchanges), 1, "Profile must not trigger QAuth exchange")
             connected.set(second)
             self.assertEqual(
-                auth.get_qledger_profile(),
+                auth.get_qledger_profile().structured_content,
                 {"id": "bob", "name": "Bob", "email": "bob@example.test"},
             )
             self.assertEqual(await auth.application_token(), second.token + ":application")
