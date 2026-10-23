@@ -9,6 +9,7 @@ on:
       - main
       - feature/dedicated-cashflowpot-mcp
       - feature/qledger-mcp
+      - experiment/qledger-oauth-reauth-challenge
   workflow_dispatch:
 
 jobs:
