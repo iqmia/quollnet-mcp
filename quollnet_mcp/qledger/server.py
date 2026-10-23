@@ -243,11 +243,12 @@ def build_qledger_server(settings: Settings) -> MCPServer:
             argument_model.model_rebuild(force=True)
 
             if name == "get_qledger_profile":
-                # MCPServer 2.0 reconstructs TypedDict output schemas via
-                # create_model() and drops its extra='forbid' config. Advertise
-                # the exact closed profile object required by ChatGPT.
-                profile_schema = server._tool_manager.get_tool(name).fn_metadata.output_schema
-                profile_schema["additionalProperties"] = False
+                # Declare the exact ChatGPT profile schema and validate the
+                # explicit CallToolResult's structuredContent. The SDK's
+                # default optional-field serializer includes null values.
+                profile_metadata = server._tool_manager.get_tool(name).fn_metadata
+                profile_metadata.output_model = qledger_auth.QLedgerProfile
+                profile_metadata.output_schema = qledger_auth.PROFILE_OUTPUT_SCHEMA
 
     @server.resource(
         "qledger://units/{unit_id}/attachments/{attachment_id}",
