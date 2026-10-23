@@ -78,6 +78,13 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 return httpx.Response(
                     200, content=b"pdf", headers={"content-type": "application/pdf"}
                 )
+            if req.url.path.endswith("/load"):
+                unit_id = req.url.path.split("/")[-2]
+                subject = req.headers["Authorization"].split(" ", 1)[1].split(":")[0]
+                return httpx.Response(
+                    200, json={"unit": {"id": unit_id}, "token": subject + ":" + unit_id,
+                               "parent": None, "children_page": []}
+                )
             return httpx.Response(
                 200, json={"items": [], "total": 0, "page": 1, "per_page": 50}
             )
@@ -143,7 +150,7 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         init["result"]["serverInfo"]["name"], "qledger-mcp"
                     )
                     tools = await rpc("tools/list", {})
-                    self.assertEqual(len(tools["result"]["tools"]), 56)
+                    self.assertEqual(len(tools["result"]["tools"]), 57)
                     results = await asyncio.gather(
                         rpc(
                             "tools/call",
