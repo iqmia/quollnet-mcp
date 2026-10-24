@@ -100,3 +100,7 @@ class OperationRequest(Schema):
         if any(r.kind != "record" for r in self.post_records):
             raise ValueError("post_records accepts record references only")
         return self
+
+
+class ProductSearchQuery(PageQuery):
+    q: str = Field(min_length=1, max_length=255)

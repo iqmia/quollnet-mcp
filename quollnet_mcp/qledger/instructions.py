@@ -114,6 +114,29 @@ A link to a posted template posts its child; preserve provenance in JSON while
 the instance must stay draft. Find a transaction's invoices/receipts with record
 queries for linked_to_object=journal_entry and its ID, optionally types=invoice,receipt.
 Query journal_line parents separately using returned line IDs for line-level evidence.
+Products are generic Records with type=product, a required nonblank string data.sku
+(case-sensitive and unique per unit), description, unit and unit_price (decimal string).
+Record.id is the permanent identity; updates change the same row/version. Search with
+search_qledger_products before referencing a catalog item. For multiple_matches ask
+which product; for not_found present ad_hoc or new_record and obtain user confirmation.
+Never invent a catalog SKU or silently convert missing products to ad-hoc lines.
+
+Invoice, purchase_order and quotation instances keep canonical data.lines separately
+from the QTypeset data.rendering layout. Every line needs a stable unique line_id,
+line_type=catalog|ad_hoc, quantity, unit_price and total. Catalog lines require sku;
+the backend resolves product_id and snapshots description/unit, defaulting the price
+only if omitted. Explicit negotiated prices are preserved. Ad-hoc lines require a
+description and no product_id. Use discount_percent or discount_amount and tax_rate
+(percent), plus subtotal, taxable_amount and tax_amount as applicable. Decimal half-up
+rounding uses currency_scale=2 by default (0..6 supported). The backend validates line
+and supplied document totals. Keep project/cost_center/budget_code as separate labels.
+Unresolved catalog drafts can be saved; posting or issuance requires nonempty lines
+and current same-unit product references. If resolution changes draft content, save
+and review it again. JSON product references do not freeze catalog products. The
+renderer projects verified lines into the standard items table and standard totals;
+store business lines even when using a custom layout. Products are never ownership
+evidence links merely because a line references them.
+
 Return backend-authorized data only. Minimal record mutation responses are intentional.
 
 Records and attachments can have multiple parents. Posted record content is immutable;

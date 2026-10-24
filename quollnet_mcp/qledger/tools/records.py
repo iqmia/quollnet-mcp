@@ -6,6 +6,7 @@ from quollnet_mcp.qledger.models_records import (
     RecordPatch,
     RecordPost,
     RecordQuery,
+    ProductSearchQuery,
 )
 from .common import call, unit_path, object_id
 
@@ -137,4 +138,14 @@ async def replace_qledger_record_link(
         _record(unit_id, record_id) + "/links/" + object_id(link_id),
         unit_id=unit_id,
         body=request,
+    )
+
+
+async def search_qledger_products(unit_id: UUID, query: ProductSearchQuery):
+    return await call(
+        qledger_client,
+        "GET",
+        unit_path(unit_id) + "/products/search",
+        unit_id=unit_id,
+        query=query,
     )

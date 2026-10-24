@@ -358,3 +358,15 @@ configured `/qledger` endpoint. Test QAuth login/unit selection, guidance/schema
 an image-bearing preview, saving/retrying and PDF download in ChatGPT. Automated
 tests cover mocked upstream APIs; live credentials and ChatGPT's binary-file
 presentation still need that acceptance check.
+
+### Product catalogs and business lines
+
+QEntries companion branch `feature/product-catalog-lines` adds `search_qledger_products(unit_id, query)`
+with exact-SKU or literal SKU/description search and structured found/multiple_matches/not_found/invalid
+responses. Missing catalog items require user confirmation before creating a product or using ad_hoc.
+Products remain generic Records with unit-unique case-sensitive data.sku and in-place versions.
+Invoice/purchase_order/quotation instances store stable line_id, catalog/ad_hoc discriminator,
+Decimal amounts and resolved product snapshots under data.lines, separately from data.rendering.
+The backend revalidates all posting/issuance paths; final PDFs use the canonical line projection.
+Deploy the QEntries backend migration `0008` before this MCP branch, then refresh connector tools.
+No QTypeset API change is required. See QEntries docs/products-and-lines.md for the payload and money policy.

@@ -174,7 +174,7 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         init["result"]["serverInfo"]["name"], "qledger-mcp"
                     )
                     tools = await rpc("tools/list", {})
-                    self.assertEqual(len(tools["result"]["tools"]), 57)
+                    self.assertEqual(len(tools["result"]["tools"]), 58)
                     profiles = [tool for tool in tools["result"]["tools"] if tool.get("_meta", {}).get("openai/profile") is True]
                     self.assertEqual([tool["name"] for tool in profiles], ["get_qledger_profile"])
 
