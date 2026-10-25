@@ -125,6 +125,8 @@ class QledgerUnitTests(unittest.IsolatedAsyncioTestCase):
         async with client(handler) as c:
             with (
                 patch.object(units, "qledger_client", c),
+                patch("quollnet_mcp.qledger.tools.common.auth.application_token",
+                      return_value="app"),
                 patch("quollnet_mcp.qledger.tools.common.auth.unit_token",
                       return_value="unit"),
             ):
@@ -156,6 +158,8 @@ class QledgerUnitTests(unittest.IsolatedAsyncioTestCase):
         async with client(handler) as c:
             with (
                 patch.object(units, "qledger_client", c),
+                patch("quollnet_mcp.qledger.tools.common.auth.application_token",
+                      return_value="app"),
                 patch("quollnet_mcp.qledger.tools.common.auth.unit_token",
                       return_value="unit"),
             ):
