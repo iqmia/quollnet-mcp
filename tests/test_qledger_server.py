@@ -55,6 +55,9 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
             "draft DN parent",
             next(t for t in tools if t.name == "link_qledger_record").description,
         )
+        load = next(t for t in tools if t.name == "load_qledger_unit")
+        self.assertIn("ai_instruction", load.description)
+        self.assertTrue(load.annotations.read_only_hint)
         get = next(t for t in tools if t.name == "get_qledger_record")
         self.assertTrue(get.annotations.read_only_hint)
         # ChatGPT also uses link_id to select the connected account. The MCP

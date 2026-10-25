@@ -1,8 +1,12 @@
 from uuid import UUID
+
+from mcp.server.mcpserver.exceptions import ToolError
+
 from quollnet_mcp.qledger import auth
 from urllib.parse import quote
 from quollnet_mcp.dependencies import qledger_client
 from quollnet_mcp.qledger.models import UnitCreate, MemberInvite, MemberRoles, PageQuery
+from quollnet_mcp.qledger.models_records import RecordQuery
 from .common import call, unit_path, object_id
 
 
@@ -45,11 +49,45 @@ async def load_qledger_unit(unit_id: UUID):
     result = await call(qledger_client, "POST", unit_path(unit_id) + "/load")
     if isinstance(result.get("token"), str):
         await auth.remember_unit_token(result["token"], unit_id)
-    return {
+    output = {
         "unit": _unit(result["unit"]),
         "parent": _unit(result.get("parent")),
         "children_page": [_unit(u) for u in result.get("children_page", [])],
     }
+    # These live records inherit ordinary record:view and unit-parent view
+    # authorization. Loading a unit must not reveal restricted instructions.
+    try:
+        page = await call(
+            qledger_client,
+            "GET",
+            unit_path(unit_id) + "/records",
+            unit_id=unit_id,
+            query=RecordQuery(
+                page=1,
+                per_page=20,
+                types="ai_instruction",
+                is_template=False,
+                is_postable=False,
+                linked_to_object="unit",
+                linked_to_object_id=str(unit_id),
+            ),
+        )
+    except ToolError as error:
+        if str(error).startswith("QLedger HTTP 403:"):
+            output["ai_instructions_access"] = "not_authorized"
+            return output
+        raise
+    if not isinstance(page, dict) or not isinstance(page.get("items"), list):
+        raise ToolError("QLedger returned an invalid instruction list.")
+    output["ai_instructions"] = [
+        {"id": row["id"], "version": row["version"], "data": row["data"]}
+        for row in page["items"]
+        if isinstance(row, dict)
+        and row.get("type") == "ai_instruction"
+        and row.get("is_postable") is False
+    ]
+    output["ai_instructions_total"] = page.get("total", len(output["ai_instructions"]))
+    return output
 
 
 async def list_qledger_members(unit_id: UUID, query: PageQuery = PageQuery()):
