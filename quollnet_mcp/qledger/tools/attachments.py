@@ -109,22 +109,24 @@ async def link_qledger_attachment(
     )
 
 
-async def unlink_qledger_attachment(unit_id: UUID, attachment_id: UUID, link_id: UUID):
+async def unlink_qledger_attachment(
+    unit_id: UUID, attachment_id: UUID, attachment_link_id: UUID
+):
     return await call(
         qledger_client,
         "DELETE",
-        _attachment(unit_id, attachment_id) + "/links/" + object_id(link_id),
+        _attachment(unit_id, attachment_id) + "/links/" + object_id(attachment_link_id),
         unit_id=unit_id,
     )
 
 
 async def replace_qledger_attachment_link(
-    unit_id: UUID, attachment_id: UUID, link_id: UUID, request: TargetRef
+    unit_id: UUID, attachment_id: UUID, attachment_link_id: UUID, request: TargetRef
 ):
     return await call(
         qledger_client,
         "PATCH",
-        _attachment(unit_id, attachment_id) + "/links/" + object_id(link_id),
+        _attachment(unit_id, attachment_id) + "/links/" + object_id(attachment_link_id),
         unit_id=unit_id,
         body=request,
     )

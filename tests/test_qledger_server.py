@@ -48,6 +48,18 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(post.annotations.read_only_hint)
         get = next(t for t in tools if t.name == "get_qledger_record")
         self.assertTrue(get.annotations.read_only_hint)
+        # ChatGPT also uses link_id to select the connected account. The MCP
+        # relationship identifier must have a distinct name in every tool schema.
+        for tool_name, relation_id in (
+            ("unlink_qledger_record", "record_link_id"),
+            ("replace_qledger_record_link", "record_link_id"),
+            ("unlink_qledger_attachment", "attachment_link_id"),
+            ("replace_qledger_attachment_link", "attachment_link_id"),
+        ):
+            schema = next(t.input_schema for t in tools if t.name == tool_name)
+            self.assertIn(relation_id, schema["required"])
+            self.assertIn(relation_id, schema["properties"])
+            self.assertNotIn("link_id", schema["properties"])
         templates = await server.list_resource_templates()
         self.assertEqual(len(templates), 1)
 

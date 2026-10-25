@@ -120,22 +120,22 @@ async def link_qledger_record(
     )
 
 
-async def unlink_qledger_record(unit_id: UUID, record_id: UUID, link_id: UUID):
+async def unlink_qledger_record(unit_id: UUID, record_id: UUID, record_link_id: UUID):
     return await call(
         qledger_client,
         "DELETE",
-        _record(unit_id, record_id) + "/links/" + object_id(link_id),
+        _record(unit_id, record_id) + "/links/" + object_id(record_link_id),
         unit_id=unit_id,
     )
 
 
 async def replace_qledger_record_link(
-    unit_id: UUID, record_id: UUID, link_id: UUID, request: RecordLinkCreate
+    unit_id: UUID, record_id: UUID, record_link_id: UUID, request: RecordLinkCreate
 ):
     return await call(
         qledger_client,
         "PATCH",
-        _record(unit_id, record_id) + "/links/" + object_id(link_id),
+        _record(unit_id, record_id) + "/links/" + object_id(record_link_id),
         unit_id=unit_id,
         body=request,
     )
