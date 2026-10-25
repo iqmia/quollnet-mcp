@@ -1,12 +1,16 @@
 from datetime import date
+
 from pydantic import Field, model_validator
-from .models import Schema, JsonData, PageQuery, TargetRef, VersionRequest
+
+from .models import JsonData, PageQuery, Schema, TargetRef, VersionRequest
 from .models_accounting import JournalCreate
+from .models_documents import DocumentFinalizeRequest
 
 
 class RecordCreate(Schema):
     type: str = Field(min_length=1, max_length=100)
     is_template: bool = False
+    is_postable: bool | None = Field(default=None, description="False for live master data/templates; true for finalizable evidence. Fixed at creation; known types provide defaults.")
     document_date: date | None = None
     reference: str | None = Field(default=None, max_length=255)
     data: JsonData
@@ -22,11 +26,13 @@ class RecordPatch(VersionRequest):
 
 
 class RecordPost(VersionRequest):
+    document_issues: dict[str, DocumentFinalizeRequest] = Field(default_factory=dict, max_length=1000)
     reviewed_attachments: dict[str, str]
     reviewed_records: dict[str, int] = Field(default_factory=dict)
 
 
 class RecordQuery(PageQuery):
+    is_postable: bool | None = None
     is_template: bool | None = None
     linked_to_object: str | None = Field(default=None, min_length=1, max_length=100)
     linked_to_object_id: str | None = Field(default=None, min_length=1, max_length=255)
@@ -72,6 +78,7 @@ class OperationLink(Schema):
 
 
 class OperationRequest(Schema):
+    document_issues: dict[str, DocumentFinalizeRequest] = Field(default_factory=dict, max_length=1000)
     records: list[OperationRecord] = Field(default_factory=list, max_length=1000)
     attachments: list[OperationAttachment] = Field(
         default_factory=list, max_length=1000

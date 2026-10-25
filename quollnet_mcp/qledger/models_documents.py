@@ -40,7 +40,7 @@ class PdfRenderRequest(Schema):
         return value
 
 
-class DocumentIssueRequest(Schema):
+class DocumentFinalizeRequest(Schema):
     version: int = Field(ge=1)
     asset_attachment_ids: dict[PartName, UUID] = Field(
         default_factory=dict, max_length=10
@@ -53,6 +53,10 @@ class DocumentIssueRequest(Schema):
     _safe_filename = field_validator("filename")(
         PdfRenderRequest.safe_filename.__func__
     )
+
+
+class DocumentIssueRequest(DocumentFinalizeRequest):
+    document_issues: dict[str, DocumentFinalizeRequest] = Field(default_factory=dict, max_length=1000)
 
 
 class DocumentStatusRequest(Schema):

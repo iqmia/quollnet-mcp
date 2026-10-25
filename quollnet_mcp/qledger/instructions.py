@@ -83,8 +83,21 @@ Prepare and explain the proposed transaction and supporting documents according 
 user instructions before posting. Journal creation and reversal create drafts.
 Accounting journal posting is permanent: send the exact reviewed version and reviewed_evidence map.
 Record posting uses its reviewed version, reviewed_records descendant-version map,
-and reviewed_attachments hashes for the full subtree. A posted record, transaction
-or line parent posts its source and record descendants; supply reviewed source fields.
+and reviewed_attachments hashes for the full subtree. The parent is the object being finalized; RecordLink.record_id is its supporting child.
+Posting finalizes draft postable children before their parent, atomically. Live records
+(is_postable=false) and attachments never require posting; they stay delete-protected
+through finalized parent links. Live data remains editable. New links to finalized
+parents are rejected. To prepare a DN, link the issued PO as child to the draft DN
+parent; similarly link DN/PO children to a draft invoice. Multiple partial deliveries
+and direct PO→invoice workflows are supported; no absent document is mandatory.
+Supply document_issues keyed by draft document record ID when a dependency has a
+QTypeset rendering definition. Each value contains the exact reviewed version,
+reviewed_records, reviewed_attachments, issuer_name, filename and image bindings.
+Issuance requires record:post and record:link; journal:post alone is insufficient.
+Any child validation/issuance failure rolls back the parent, numbering and files.
+For execute_qledger_operation document_issues may use local record keys; local
+membership comes from the explicit bundle. Existing records require review before
+bundle changes. Never manufacture an issuance request without user authorization.
 A non-issued record can be unposted with record:post and its current version only
 if no parent is posted. Issued records remain immutable and cannot be unposted. Unposting does not unpost descendants or delete a parentless draft.
 Never reload and substitute new versions/hashes to bypass a 409 conflict: reload,
@@ -92,7 +105,14 @@ explain the changes and obtain authorization for the changed content. Lock overr
 require explicit permission, override_lock and an authorized reason. Correct posted
 accounting with new reversal/correcting entries, not edits to immutable content.
 
-Records store arbitrary finite JSON. Types remain caller-defined; approved unit
+Records store arbitrary finite JSON. Keep is_template and is_postable distinct.
+Known master types default to live, unknown types default to postable; explicitly
+classify custom types at creation. Classification cannot later be changed. The API
+exposes lifecycle=live while retaining internal status=draft for live records.
+Give reusable products/profiles/templates durable native unit/account/user parent links.
+Received documents without a rendering definition can be posted as source evidence;
+prepared QTypeset documents require official issuance.
+ Types remain caller-defined; approved unit
 schemas may validate JSON separately for is_template=true and false. The caller chooses
 an invoice/receipt/order pattern. Use the same canonical document type for templates
 and instances, distinguished by the is_template flag. Resolve names/aliases from
@@ -102,7 +122,8 @@ template_key family, then greatest template_version, falling back to creation da
 and stable ID. These JSON metadata conventions are not backend automatic selection.
 If absent, save a new QTypeset-compatible template with is_template=true linked to
 the unit. Create the document instance with is_template=false; copying preserves
-the flag, so change it on a copied draft. Save complete rendering input and
+both flags. To instantiate a template, create a new record with is_template=false
+and is_postable=true using the chosen layout; a template copy remains live. Save complete rendering input and
 historical issuer/party details, template identity/version, and attach the issued
 PDF using issue_qledger_record; QEntries delegates printing to QTypeset. A price offer
 needs no journal. All relation labels remain caller-defined; draft_pdf and issued_pdf
@@ -110,8 +131,8 @@ are conventions used by QEntries rendering/issuance. A relation label alone neve
 authoritative issuance status: use get_qledger_issued_document and verification.
 Document numbering is separate from accounting posting: do not invent fiscal numbering or local tax treatment.
 Ask for missing tax/legal facts and use the unit's approved settings.
-A link to a posted template posts its child; preserve provenance in JSON while
-the instance must stay draft. Find a transaction's invoices/receipts with record
+Templates remain live (is_template=true, is_postable=false). Keep their identity/version
+in the instance JSON; linking them as live children does not freeze their content. Find a transaction's invoices/receipts with record
 queries for linked_to_object=journal_entry and its ID, optionally types=invoice,receipt.
 Query journal_line parents separately using returned line IDs for line-level evidence.
 Products are generic Records with type=product, a required nonblank string data.sku

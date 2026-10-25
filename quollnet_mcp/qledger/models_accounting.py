@@ -1,16 +1,19 @@
 from datetime import date
 from typing import Literal
 from uuid import UUID
+
 from pydantic import Field, model_validator
+
 from .models import (
-    Schema,
+    ClassificationName,
     Currency,
+    EvidenceManifest,
     Money,
     Rate,
-    EvidenceManifest,
+    Schema,
     VersionRequest,
-    ClassificationName,
 )
+from .models_documents import DocumentFinalizeRequest
 
 
 class AccountCreate(Schema):
@@ -85,6 +88,7 @@ class JournalPatch(VersionRequest):
 
 
 class PostRequest(VersionRequest):
+    document_issues: dict[str, DocumentFinalizeRequest] = Field(default_factory=dict, max_length=1000)
     reviewed_evidence: EvidenceManifest
     override_lock: bool = False
     override_reason: str | None = Field(default=None, min_length=1, max_length=1000)

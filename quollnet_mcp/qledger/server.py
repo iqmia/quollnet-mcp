@@ -7,8 +7,8 @@ from mcp.server.auth.settings import AuthSettings
 from mcp.types import ToolAnnotations
 
 from quollnet_mcp.auth import QAuthTokenVerifier
-from quollnet_mcp.qledger import auth as qledger_auth
 from quollnet_mcp.config import Settings
+from quollnet_mcp.qledger import auth as qledger_auth
 from quollnet_mcp.qledger.files import attachment_resource
 from quollnet_mcp.qledger.instructions import QLEDGER_INSTRUCTIONS
 from quollnet_mcp.qledger.tools import (
@@ -167,7 +167,7 @@ _DESCRIPTIONS = {
     "download_qledger_attachment": "Retrieve original bytes as an authenticated binary MCP resource plus file metadata. Default maximum 10 MiB; rendering depends on the client.",
     "upload_qledger_attachment": "Upload an authorized ChatGPT file reference with an initial parent. The adapter downloads bounded original bytes without conversion and forwards multipart data. file_name and filename are optional aliases; default limit 10 MiB.",
     "execute_qledger_operation": "Atomically register records, a NEW journal, files and explicit links, with optional explicitly authorized posting. Existing records that may post need reviewed versions/hashes. Supply files as a list aligned with operation.attachments order. Never split the request into separate creates.",
-    "list_qledger_records": "Find authorized records by parent, types and optional is_template flag. To find invoice templates, use types=invoice, is_template=true and the native unit parent. Relation is a caller-defined label. Paginate all matching templates before selecting the suitable family/version/date.",
+    "list_qledger_records": "Find authorized records by parent, types and optional is_template/is_postable flags. To find invoice templates, use types=invoice, is_template=true and the native unit parent. Relation is a caller-defined label. Paginate all matching templates before selecting the suitable family/version/date.",
     "delete_qledger_record": "Delete an eligible unposted parentless record with its current version; QLedger recursively cleans eligible children.",
     "copy_qledger_record": "Copy the specified reviewed source version into a new unlinked draft; requires source view and record:add.",
 }
