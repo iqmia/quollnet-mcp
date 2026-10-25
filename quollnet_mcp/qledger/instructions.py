@@ -131,6 +131,22 @@ are conventions used by QEntries rendering/issuance. A relation label alone neve
 authoritative issuance status: use get_qledger_issued_document and verification.
 Document numbering is separate from accounting posting: do not invent fiscal numbering or local tax treatment.
 Ask for missing tax/legal facts and use the unit's approved settings.
+For tax identifiers use check_qledger_tax_identifier with an explicit country_code;
+initial support is PT NIF/NIPC, other countries return unsupported. This is an
+MCP-side reproducible format/checksum check, not QEntries validation or an AT/VAT/
+ownership lookup. Even a passed checksum remains externally unverified. Warn on
+failure; when the user explicitly confirms an authorized data-entry update,
+preserve their supplied identifier and record the check/confirmation as metadata
+if requested. Never silently replace digits or mark the identifier verified.
+Advisory checksum failure alone does not block generic live-record storage;
+backend permissions, schema validation and immutability still apply. A management
+confirmation documents acceptance of uncertain data; it does not validate the ID
+or grant a new permission. Preserve unrelated data when PATCH replaces record.data.
+Report successful writes only after a successful tool result, then re-read when
+needed. Distinguish a backend HTTP error, an explicit platform rejection and no
+attempt. Do not claim OpenAI safety checks blocked an operation without an actual
+platform rejection; report the available error accurately without inventing causes.
+
 Templates remain live (is_template=true, is_postable=false). Keep their identity/version
 in the instance JSON; linking them as live children does not freeze their content. Find a transaction's invoices/receipts with record
 queries for linked_to_object=journal_entry and its ID, optionally types=invoice,receipt.
@@ -142,12 +158,16 @@ search_qledger_products before referencing a catalog item. For multiple_matches 
 which product; for not_found present ad_hoc or new_record and obtain user confirmation.
 Never invent a catalog SKU or silently convert missing products to ad-hoc lines.
 
+Before creating/editing invoice, purchase_order or quotation lines, call
+get_qledger_line_item_guidance for the canonical JSON example and typed schema.
+Generic Record.data remains JSON; the reference schema is for complete canonical
+instances, not every custom record/template/partial draft. Use exact decimal strings.
 Invoice, purchase_order and quotation instances keep canonical data.lines separately
 from the QTypeset data.rendering layout. Every line needs a stable unique line_id,
-line_type=catalog|ad_hoc, quantity, unit_price and total. Catalog lines require sku;
-the backend resolves product_id and snapshots description/unit, defaulting the price
-only if omitted. Explicit negotiated prices are preserved. Ad-hoc lines require a
-description and no product_id. Use discount_percent or discount_amount and tax_rate
+line_type=catalog|ad_hoc and quantity. Catalog lines require sku; the backend resolves
+product_id and snapshots description/unit, defaulting missing price from the product
+and computing total when omitted. Explicit negotiated prices are preserved.
+Ad-hoc lines require description, unit_price,total and no non-null product_id. Use discount_percent or discount_amount and tax_rate
 (percent), plus subtotal, taxable_amount and tax_amount as applicable. Decimal half-up
 rounding uses currency_scale=2 by default (0..6 supported). The backend validates line
 and supplied document totals. Keep project/cost_center/budget_code as separate labels.

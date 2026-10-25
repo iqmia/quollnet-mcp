@@ -6,24 +6,27 @@ import time
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
+
 import httpx
 import jwt
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
-from tests.qledger_support import U, E, A, settings
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from tests.qledger_support import A, E, U, settings
 
 
 class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
     async def test_authenticated_rpc_isolation_and_binary_resource(self):
+        from mcp.server.transport_security import TransportSecuritySettings
+
         import combined_app
         from combined_app import build_combined_app
-        from mcp.server.transport_security import TransportSecuritySettings
         from quollnet_mcp.cashflowpot.server import build_cashflowpot_server
         from quollnet_mcp.dependencies import (
-            qledger_client,
-            qauth_client,
             qapp_client,
+            qauth_client,
             qflow_client,
+            qledger_client,
         )
 
         private = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -174,7 +177,7 @@ class QledgerWorkflowTests(unittest.IsolatedAsyncioTestCase):
                         init["result"]["serverInfo"]["name"], "qledger-mcp"
                     )
                     tools = await rpc("tools/list", {})
-                    self.assertEqual(len(tools["result"]["tools"]), 58)
+                    self.assertEqual(len(tools["result"]["tools"]), 60)
                     profiles = [tool for tool in tools["result"]["tools"] if tool.get("_meta", {}).get("openai/profile") is True]
                     self.assertEqual([tool["name"] for tool in profiles], ["get_qledger_profile"])
 

@@ -15,6 +15,7 @@ from quollnet_mcp.qledger.tools import (
     accounts,
     attachments,
     documents,
+    guidance,
     journals,
     operations,
     records,
@@ -114,6 +115,7 @@ _GROUPS = (
         ),
     ),
     (operations, ("execute_qledger_operation",)),
+    (guidance, ("check_qledger_tax_identifier", "get_qledger_line_item_guidance")),
     (
         documents,
         (
@@ -137,6 +139,8 @@ _KEYED = {
     "execute_qledger_operation",
 }
 _DESCRIPTIONS = {
+    "check_qledger_tax_identifier": "Read-only advisory tax-ID format/checksum check; country_code defaults to PT (Portuguese NIF/NIPC). Other countries return unsupported. Returns exact input, normalized input and diagnostic digits, never registry/ownership/VAT verification. Does not update or block record storage; do not silently correct identifiers.",
+    "get_qledger_line_item_guidance": "Read canonical invoice/purchase_order/quotation JSON example and typed discriminated catalog/ad_hoc JSON Schema before creating or editing business lines. Includes exact required fields, decimal/discount/tax/total rules, product snapshots and extension fields. Reference only; QEntries remains authoritative and generic record JSON stays supported.",
     "search_qledger_products": "Find catalog products by exact case-sensitive SKU, otherwise literal SKU/description substring in the selected unit. Returns found, multiple_matches, not_found or invalid. Paginate candidates. No match offers ad_hoc/new_record alternatives that require user confirmation; never invent a SKU or silently switch to ad-hoc.",
     "get_qledger_profile": "Identify the QAuth user represented by this authenticated ChatGPT connection. Read-only and requires no unit ID. Returns a stable user ID plus available display name/email; never takes a user selector.",
     "get_qledger_document_design_guidance": "Read advisory document design guidance before creating or changing templates: typography, headers/logos, neutral Issued By/To blocks, tables, totals, spacing, images and issuance snapshots. User preferences override defaults. Set include_schema=true for the native QTypeset v2 contract when designing an unfamiliar layout.",
@@ -199,7 +203,7 @@ def build_qledger_server(settings: Settings) -> MCPServer:
                 .replace("qledger", "QLedger")
             )
             read_only = (
-                name.startswith(("list_", "get_", "download_", "search_"))
+                name.startswith(("list_", "get_", "download_", "search_", "check_"))
                 or name == "load_qledger_unit"
             )
             destructive = not read_only and not name.startswith(

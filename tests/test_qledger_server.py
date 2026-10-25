@@ -2,20 +2,22 @@ import os
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
+
 import httpx
+
 from tests.qledger_support import settings
 
 
 class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
     async def test_registration_and_schemas(self):
-        from quollnet_mcp.qledger.server import build_qledger_server
         from app import mcp
         from combined_app import cashflowpot_mcp
+        from quollnet_mcp.qledger.server import build_qledger_server
 
         server = build_qledger_server(settings())
         tools = await server.list_tools()
         names = {t.name for t in tools}
-        self.assertEqual(len(names), 58)
+        self.assertEqual(len(names), 60)
         for required in [
             "execute_qledger_operation",
             "post_qledger_transaction",
@@ -118,6 +120,5 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
         with patch.dict(
             os.environ,
             {"QLEDGER_ENABLED": "true", "QLEDGER_APP_ID": "", "QLEDGER_BASE_URL": ""},
-        ):
-            with self.assertRaises(ValueError):
-                get_settings()
+        ), self.assertRaises(ValueError):
+            get_settings()

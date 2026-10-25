@@ -1,0 +1,37 @@
+{
+  "type": "invoice",
+  "is_template": false,
+  "is_postable": true,
+  "data": {
+    "currency": "EUR",
+    "currency_scale": 2,
+    "lines": [
+      {
+        "line_id": "line-1",
+        "line_type": "catalog",
+        "sku": "WP-001",
+        "quantity": "10",
+        "unit_price": "20.00",
+        "discount_percent": "10",
+        "tax_rate": "0",
+        "total": "180.00"
+      },
+      {
+        "line_id": "line-2",
+        "line_type": "ad_hoc",
+        "description": "Installation",
+        "quantity": "1",
+        "unit": "job",
+        "unit_price": "100.00",
+        "tax_rate": "0",
+        "total": "100.00",
+        "cost_center": "waterproofing.labour"
+      }
+    ],
+    "subtotal": "300.00",
+    "discount_amount": "20.00",
+    "taxable_amount": "280.00",
+    "tax_amount": "0.00",
+    "total": "280.00"
+  }
+}

@@ -1,0 +1,375 @@
+{
+  "$defs": {
+    "AdHocLine": {
+      "additionalProperties": true,
+      "properties": {
+        "line_id": {
+          "description": "Stable within the document; never change on reorder; unique per document.",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "title": "Line Id",
+          "type": "string"
+        },
+        "quantity": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Quantity",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Project"
+        },
+        "cost_center": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost Center"
+        },
+        "discount_percent": {
+          "description": "0..100 percent. Use this OR discount_amount on initial input; server validates calculated amounts.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Discount Percent",
+          "type": "string"
+        },
+        "discount_amount": {
+          "description": "Currency-precision amount reducing subtotal; must not exceed its magnitude.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Discount Amount",
+          "type": "string"
+        },
+        "tax_rate": {
+          "description": "0..1000 percent; zero if omitted. Supply only from supported tax facts.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Tax Rate",
+          "type": "string"
+        },
+        "subtotal": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Subtotal",
+          "type": "string"
+        },
+        "taxable_amount": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Taxable Amount",
+          "type": "string"
+        },
+        "tax_amount": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Tax Amount",
+          "type": "string"
+        },
+        "line_type": {
+          "const": "ad_hoc",
+          "title": "Line Type",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "title": "Description",
+          "type": "string"
+        },
+        "unit_price": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Unit Price",
+          "type": "string"
+        },
+        "total": {
+          "description": "Required submitted total, checked against backend arithmetic.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Total",
+          "type": "string"
+        },
+        "product_id": {
+          "description": "Ad-hoc lines cannot identify a catalog product.",
+          "title": "Product Id",
+          "type": "null"
+        }
+      },
+      "required": [
+        "line_id",
+        "quantity",
+        "line_type",
+        "description",
+        "unit_price",
+        "total"
+      ],
+      "title": "AdHocLine",
+      "type": "object"
+    },
+    "CatalogLine": {
+      "additionalProperties": true,
+      "properties": {
+        "line_id": {
+          "description": "Stable within the document; never change on reorder; unique per document.",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "title": "Line Id",
+          "type": "string"
+        },
+        "quantity": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Quantity",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Project"
+        },
+        "cost_center": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cost Center"
+        },
+        "discount_percent": {
+          "description": "0..100 percent. Use this OR discount_amount on initial input; server validates calculated amounts.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Discount Percent",
+          "type": "string"
+        },
+        "discount_amount": {
+          "description": "Currency-precision amount reducing subtotal; must not exceed its magnitude.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Discount Amount",
+          "type": "string"
+        },
+        "tax_rate": {
+          "description": "0..1000 percent; zero if omitted. Supply only from supported tax facts.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Tax Rate",
+          "type": "string"
+        },
+        "subtotal": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Subtotal",
+          "type": "string"
+        },
+        "taxable_amount": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Taxable Amount",
+          "type": "string"
+        },
+        "tax_amount": {
+          "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Tax Amount",
+          "type": "string"
+        },
+        "line_type": {
+          "const": "catalog",
+          "title": "Line Type",
+          "type": "string"
+        },
+        "sku": {
+          "description": "Case-sensitive SKU from confirmed same-unit product search.",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "title": "Sku",
+          "type": "string"
+        },
+        "product_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Resolved same-unit Record.id; if supplied it must match SKU.",
+          "title": "Product Id"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Backend snapshots verified product description on create/update.",
+          "title": "Description"
+        },
+        "unit_price": {
+          "anyOf": [
+            {
+              "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+              "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Negotiated unit price; omit to use catalog price.",
+          "title": "Unit Price"
+        },
+        "total": {
+          "description": "Backend calculates; any supplied total must match.",
+          "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+          "title": "Total",
+          "type": "string"
+        }
+      },
+      "required": [
+        "line_id",
+        "quantity",
+        "line_type",
+        "sku"
+      ],
+      "title": "CatalogLine",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "currency": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Explicit unit currency code; never infer tax treatment from it.",
+      "title": "Currency"
+    },
+    "currency_scale": {
+      "default": 2,
+      "maximum": 6,
+      "minimum": 0,
+      "title": "Currency Scale",
+      "type": "integer"
+    },
+    "lines": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "ad_hoc": "#/$defs/AdHocLine",
+            "catalog": "#/$defs/CatalogLine"
+          },
+          "propertyName": "line_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/CatalogLine"
+          },
+          {
+            "$ref": "#/$defs/AdHocLine"
+          }
+        ]
+      },
+      "maxItems": 10000,
+      "minItems": 1,
+      "title": "Lines",
+      "type": "array"
+    },
+    "subtotal": {
+      "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+      "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+      "title": "Subtotal",
+      "type": "string"
+    },
+    "discount_amount": {
+      "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+      "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+      "title": "Discount Amount",
+      "type": "string"
+    },
+    "taxable_amount": {
+      "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+      "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+      "title": "Taxable Amount",
+      "type": "string"
+    },
+    "tax_amount": {
+      "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+      "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+      "title": "Tax Amount",
+      "type": "string"
+    },
+    "total": {
+      "description": "Exact signed decimal string; magnitude below 1e18; at most 12 decimal places.",
+      "pattern": "^-?(?:0|[1-9][0-9]{0,17})(?:\\.[0-9]{1,12})?$",
+      "title": "Total",
+      "type": "string"
+    }
+  },
+  "required": [
+    "lines"
+  ],
+  "title": "DocumentData",
+  "type": "object"
+}
