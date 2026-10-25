@@ -93,7 +93,7 @@ class QledgerUnitTests(unittest.IsolatedAsyncioTestCase):
                         (seen[-1].method, seen[-1].url.path), (method, path)
                     )
                 self.assertIn("role%2Fwith%20space", str(seen[-1].url))
-                self.assertIs(json.loads(seen[4].content)["send_email"], False)
+                self.assertIs(json.loads(seen[5].content)["send_email"], False)
 
     async def test_load_exposes_only_authorized_unit_instruction_records(self):
         import httpx
