@@ -83,21 +83,56 @@ Prepare and explain the proposed transaction and supporting documents according 
 user instructions before posting. Journal creation and reversal create drafts.
 Accounting journal posting is permanent: send the exact reviewed version and reviewed_evidence map.
 Record posting uses its reviewed version, reviewed_records descendant-version map,
-and reviewed_attachments hashes for the full subtree. The parent is the object being finalized; RecordLink.record_id is its supporting child.
-Posting finalizes draft postable children before their parent, atomically. Live records
-(is_postable=false) and attachments never require posting; they stay delete-protected
-through finalized parent links. Live data remains editable. New links to finalized
-parents are rejected. To prepare a DN, link the issued PO as child to the draft DN
-parent; similarly link DN/PO children to a draft invoice. Multiple partial deliveries
-and direct PO→invoice workflows are supported; no absent document is mandatory.
-Supply document_issues keyed by draft document record ID when a dependency has a
-QTypeset rendering definition. Each value contains the exact reviewed version,
-reviewed_records, reviewed_attachments, issuer_name, filename and image bindings.
-Issuance requires record:post and record:link; journal:post alone is insufficient.
-Any child validation/issuance failure rolls back the parent, numbering and files.
-For execute_qledger_operation document_issues may use local record keys; local
-membership comes from the explicit bundle. Existing records require review before
-bundle changes. Never manufacture an issuance request without user authorization.
+and reviewed_attachments SHA-256 hashes for the entire linked supporting subtree.
+The PARENT is the record being finalized; RecordLink.record_id is its supporting
+CHILD. Posting finalizes draft postable children before the parent, atomically.
+Live records (is_postable=false) and attachments never require posting; they remain
+delete-protected through finalized parent links. Live records remain editable.
+Existing posted supporting documents may be children of NEW draft parents; adding
+links to a posted parent is prohibited. Do not invent mandatory document sequences.
+
+RECEIVED THIRD-PARTY DOCUMENTS: A supplier invoice, delivery note (DN), receipt or
+quotation uploaded as original evidence is NOT a document our unit is issuing.
+When its record is a draft with is_postable=true and no QTypeset rendering payload,
+the user's explicit "post", "finalize" or "protect these records" instruction
+authorizes post_qledger_record as received evidence. Use request.version plus exact
+reviewed_records and reviewed_attachments; leave document_issues empty for such
+records. Do NOT call issue_qledger_record, render a new PDF, allocate a new document
+number, require an issued_pdf/verification QR, or post a journal/payment merely to
+finalize received evidence. Preserve the original source PDF and its references.
+If a record includes a QTypeset rendering definition, it instead requires
+document_issues/official issuance; never bypass this rule to force it posted.
+Actual permissions, tax policy and validation remain authoritative in QEntries.
+
+EXAMPLE: A two-page supplier PDF contains DN1 and INV1. Save separate postable
+draft records and link the SAME original PDF attachment to both. Verify PO1 exists
+and matches the reference; for a desired PO -> DN -> invoice evidence chain, call
+link_qledger_record with record_id=PO1.id and parent target
+{linked_to_object:"record", linked_to_object_id:DN1.id}, then with
+record_id=DN1.id and parent target
+{linked_to_object:"record", linked_to_object_id:INV1.id}. Both parents must
+still be drafts while adding the links. The posted PO is unchanged. On "post
+them", post_qledger_record for the invoice parent once; QEntries finalizes the
+draft DN child first and preserves the posted PO. Review the WHOLE resulting
+subtree: reviewed_records includes DN1 and PO1 versions and reviewed_attachments
+includes the shared PDF hash plus every other linked descendant attachment.
+If links are intentionally absent, post independent draft records individually;
+absence of a PO or DN does not itself prevent a record posting. Never fabricate
+a matching PO/DN or silently assert that a supplier document was issued by us.
+A record query with linked_to_object=record and linked_to_object_id=INV1.id
+finds its child records; list_qledger_record_links(INV1.id) instead lists
+the parents of INV1, not its supporting children.
+
+For QTypeset-issued documents, supply document_issues keyed by draft document
+record ID when a dependency has a rendering definition. Each value contains
+the exact reviewed version, reviewed_records, reviewed_attachments, issuer_name,
+filename and image bindings. Issuance requires record:post and record:link;
+journal:post alone is insufficient. A child failure rolls back the parent,
+numbering and files. For execute_qledger_operation document_issues may use local
+record keys; existing records require review. Never manufacture issuance or
+posting authorization. If any MCP/tool call is blocked, distinguish actual
+platform rejection from QEntries HTTP validation, authorization or a missing
+request field; give the real error rather than attributing it to "safety checks".
 A non-issued record can be unposted with record:post and its current version only
 if no parent is posted. Issued records remain immutable and cannot be unposted. Unposting does not unpost descendants or delete a parentless draft.
 Never reload and substitute new versions/hashes to bypass a 409 conflict: reload,

@@ -46,6 +46,15 @@ class QledgerServerTests(unittest.IsolatedAsyncioTestCase):
         post = next(t for t in tools if t.name == "post_qledger_transaction")
         self.assertTrue(post.annotations.destructive_hint)
         self.assertFalse(post.annotations.read_only_hint)
+        received_post = next(t for t in tools if t.name == "post_qledger_record")
+        self.assertIn("RECEIVED supplier invoices", received_post.description)
+        self.assertIn("document_issues={}", received_post.description)
+        self.assertTrue(received_post.annotations.destructive_hint)
+        self.assertFalse(received_post.annotations.read_only_hint)
+        self.assertIn(
+            "draft DN parent",
+            next(t for t in tools if t.name == "link_qledger_record").description,
+        )
         get = next(t for t in tools if t.name == "get_qledger_record")
         self.assertTrue(get.annotations.read_only_hint)
         # ChatGPT also uses link_id to select the connected account. The MCP

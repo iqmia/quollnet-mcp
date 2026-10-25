@@ -59,6 +59,31 @@ class PostableLifecycleTests(unittest.IsolatedAsyncioTestCase):
                     "asset_attachment_ids": {},
                     "filename": "document.pdf",
                 }
+                # Inbound supplier documents have no QTypeset rendering. Their
+                # posting call forwards evidence without an issuance request.
+                shared_pdf = "424c1e0343fd27d150b83643764a140d183848afedf6d1096720835b3afed86a"
+                await records.post_qledger_record(
+                    U,
+                    R,
+                    RecordPost(
+                        version=1,
+                        reviewed_records={E: 1},
+                        reviewed_attachments={A: shared_pdf},
+                    ),
+                )
+                self.assertEqual(
+                    json.loads(seen[-1].content),
+                    {
+                        "version": 1,
+                        "reviewed_records": {E: 1},
+                        "reviewed_attachments": {A: shared_pdf},
+                        "document_issues": {},
+                    },
+                )
+                self.assertEqual(
+                    seen[-1].url.path,
+                    f"/api/units/{U}/records/{R}/post",
+                )
                 await journals.post_qledger_transaction(
                     U,
                     E,
