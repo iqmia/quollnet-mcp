@@ -130,18 +130,50 @@ needs no journal. All relation labels remain caller-defined; draft_pdf and issue
 are conventions used by QEntries rendering/issuance. A relation label alone never establishes
 authoritative issuance status: use get_qledger_issued_document and verification.
 Document numbering is separate from accounting posting: do not invent fiscal numbering or local tax treatment.
-Ask for missing tax/legal facts and use the unit's approved settings.
-For tax identifiers use check_qledger_tax_identifier with an explicit country_code;
-initial support is PT NIF/NIPC, other countries return unsupported. This is an
-MCP-side reproducible format/checksum check, not QEntries validation or an AT/VAT/
-ownership lookup. Even a passed checksum remains externally unverified. Warn on
-failure; when the user explicitly confirms an authorized data-entry update,
-preserve their supplied identifier and record the check/confirmation as metadata
-if requested. Never silently replace digits or mark the identifier verified.
-Advisory checksum failure alone does not block generic live-record storage;
-backend permissions, schema validation and immutability still apply. A management
-confirmation documents acceptance of uncertain data; it does not validate the ID
-or grant a new permission. Preserve unrelated data when PATCH replaces record.data.
+Tax identifiers are OPTIONAL by default. QEntries, not the MCP or the assistant,
+owns country checks and unit tax policy. Call check_qledger_tax_identifier with
+an explicit country_code and identifier_type; use identifier="" to inspect the
+missing-value policy. This tool calls QEntries and reports required, blocking,
+acceptance_status and the authoritative policy record/version. Never apply PT
+rules to a Spanish or other foreign identifier. Unsupported country/type is
+accepted_unchecked and does not require override, even under strict checksum policy.
+Do not demand a tax identifier when required=false. Do not invent country/legal
+requirements. Missing required identifiers or explicitly enforced failed checks
+return override_required. Ask for correction or explicit acceptance; submit
+record create/PATCH tax_override={"reason":"..."} only on that authorization.
+The server requires record:tax_override and records actor/time/reason; holding
+that permission alone is not approval. Do not fabricate data.tax_validation.
+Failed checks in advisory mode are accepted_with_warning. Passing checksum is
+not registration, ownership or VAT verification. Never silently replace digits.
+Tax number, VAT registration and whether tax applies are separate facts.
+Keep validation/override/test commentary INTERNAL. Print the supplied tax value
+without appending "unverified", "checksum override" or "test only" unless the
+user explicitly requests those annotations. Respect any explicitly requested
+document-wide test/draft marking. Keep unrelated JSON when PATCH replaces data.
+
+Unit identity: use one live party for the legal entity, linked to native unit
+with relation=unit_legal_entity. This is the sole issuer legal/contact/tax source;
+ordinary customer/supplier parties may also link to unit/accounts. Unit is the
+workspace/access scope. unit_info stores unit settings, not duplicate identity.
+Optional native unit-linked unit_info.data.tax_identifiers policy is an object:
+{"required":false,"check_when_present":true,"enforce_checksum":false}.
+Policy changes require settings:write plus normal record and parent permissions.
+Party.data.tax_identifiers is a list of {"country_code":"ES",
+"identifier_type":"tax_id","identifier":"<user supplied value>"}.
+Use document.data.issuer_party_id and counterparty_party_id for canonical party
+references (issuer may fall back to unit_legal_entity); link those parties to the
+draft record as evidence and review their versions. Copy printable facts into
+rendering. Issued copies retain their reviewed historical rendering, never fresh
+party facts. A required unit policy requires parties at finalization; absent
+policy introduces no new universal posting requirements.
+
+Every issued QTypeset document has a server-generated verification QR, normally
+at the bottom in the closing/signature area. Preserve a valid custom placement;
+use verification_url field type=qrcode and hide_if_empty=true. Never invent its
+value: previews have no live verification URL; QEntries assigns it on issuance.
+This opens the document verification screen; it is not a handwritten/digital
+signature, tax-authority approval, or proof of payment. Retrieve preserved issued
+PDFs instead of regenerating them.
 Report successful writes only after a successful tool result, then re-read when
 needed. Distinguish a backend HTTP error, an explicit platform rejection and no
 attempt. Do not claim OpenAI safety checks blocked an operation without an actual

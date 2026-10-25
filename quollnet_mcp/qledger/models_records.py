@@ -5,9 +5,14 @@ from pydantic import Field, model_validator
 from .models import JsonData, PageQuery, Schema, TargetRef, VersionRequest
 from .models_accounting import JournalCreate
 from .models_documents import DocumentFinalizeRequest
+from .tax_identifiers import TaxOverride
 
 
 class RecordCreate(Schema):
+    tax_override: TaxOverride | None = Field(
+        default=None,
+        description="Explicit tax-policy exception with reason. QEntries requires record:tax_override and records authenticated approval; never set automatically.",
+    )
     type: str = Field(min_length=1, max_length=100)
     is_template: bool = False
     is_postable: bool | None = Field(
@@ -23,6 +28,10 @@ class RecordCreate(Schema):
 
 
 class RecordPatch(VersionRequest):
+    tax_override: TaxOverride | None = Field(
+        default=None,
+        description="Explicit tax-policy exception with reason; requires record:tax_override. Do not forge approval metadata in data.",
+    )
     is_template: bool | None = None
     type: str | None = Field(default=None, min_length=1, max_length=100)
     document_date: date | None = None

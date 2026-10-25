@@ -1,60 +1,98 @@
 # QEntries MCP data checks and document lines
 
-The MCP adapter provides two read-only tools in the selected authenticated unit:
-
-- `check_qledger_tax_identifier(unit_id, identifier, country_code="PT")`
+Two read-only tools serve the selected authenticated unit:
+- `check_qledger_tax_identifier(unit_id, identifier, country_code, identifier_type="tax_id")`
 - `get_qledger_line_item_guidance(unit_id)`
 
-Neither tool creates records, posts journals, issues documents or changes data.
-Deploy this MCP change and refresh the ChatGPT connection to discover the tools.
-No backend change or database migration is needed.
+Deploy BOTH QEntries and this MCP branch, then refresh the connection. The prior
+MCP-only implementation was not deployed: it is superseded here. No DB migration.
+The tax tool now calls POST /api/units/{unit_id}/tax-identifiers/check; no local
+MCP algorithm or fallback guessing remains. The typed line guidance is retained.
 
-## Tax identifier checks
+## Tax identifier policy and identity
 
-Initial support is **Portugal (PT), NIF/NIPC**. A generic TIN label does not identify
-a country. Supply country_code explicitly; unsupported countries return
-`status=unsupported_country`, with no invented algorithm or checksum result.
+Identifiers are optional by default. A native unit-linked `unit_info` record can
+set `data.tax_identifiers` to an object:
 
-The tool preserves `identifier` exactly and returns `normalized_identifier`
-separately. A PT prefix, ASCII spaces and hyphens can be removed for the
-calculation; other letters/Unicode digits are not silently repaired. Basic format
-requires nine ASCII digits with a nonzero first digit. Prefix allocation ranges
-and taxpayer category are not checked.
+```json
+{"required":false,"check_when_present":true,"enforce_checksum":false}
+```
 
-For PT, multiply the first eight digits by 9 through 2, sum, and take modulo 11.
-The expected digit is 0 for remainder 0/1, otherwise 11 minus the remainder. The
-Portuguese regional-government [validation guide, pages2–3](https://proderam2020.madeira.gov.pt/images/documentos/Candidaturas/ACAPORAMA/Guia_de_validacao_M19.2.1.ii_a8b41.pdf)
-documents this algorithm. Only the arithmetic is adopted; dated prefix-allocation
-claims in that guide are not used.
+Policy writes need settings:write plus normal record/parent permissions. No policy
+means those defaults. `required` concerns presence; `enforce_checksum` separately
+controls supported failed checks. Unsupported country/type always allows the
+supplied nonempty ID, without override. A Spanish client of a Portuguese unit
+can therefore use its Spanish ID even when the service cannot check it.
 
-For `517115897`, the tool returns `status=failed_checksum`, `weighted_sum=175`,
-`expected_check_digit="1"`, `supplied_check_digit="7"`, `checksum_valid=false`.
-For `501234567`, the expected check digit is 0; it also fails. Never replace either
-identifier with a guessed correction merely because a different last digit would
-pass the formula.
-
-Every result has `blocking=false` and `verification_status=unverified`, even when
-the checksum passes. This does not establish tax-authority registration, ownership,
-VAT status or the existence of a taxpayer. No registry lookup is made.
-
-When a user confirms storage of an identifier that failed the advisory check,
-retain the supplied value and record the warning/confirmation as metadata if
-requested. For example, metadata can contain:
+The native unit is the workspace. A live `party` linked to it with
+`relation=unit_legal_entity` holds the sole issuer legal/contact/tax identity.
+Only one such party is allowed. `unit_info` holds settings, not duplicate company
+identity. Other parties can be customers/suppliers and link to unit/accounts.
+Canonical party content:
 
 ```json
 {
-  "tax_validation_status": "failed_checksum_user_overridden",
-  "verification_status": "unverified"
+  "name":"Client name",
+  "tax_identifiers":[
+    {"country_code":"ES","identifier_type":"tax_id","identifier":"supplied identifier"}
+  ]
 }
 ```
 
-This documents acceptance of uncertain input, not a backend permission or fiscal
-validation override. Backend permissions, immutable evidence and active unit
-schemas still govern writes. Read the existing record/version first, preserve
-unrelated fields when replacing its data JSON, save through ordinary CRUD and
-verify the actual result. Distinguish backend errors, explicit platform rejections
-and an operation that was never attempted. Never invent a safety-rejection cause
-or announce an update before a successful tool response.
+Use document `data.issuer_party_id` and `counterparty_party_id`; issuer falls back
+to the unit legal party. Link parties as evidence and review current versions.
+Copy printable facts into the reviewed rendering, preserving issued snapshots.
+QEntries rechecks canonical party references on finalization. Required policy
+requires parties then. Legacy arbitrary JSON keys are not guessed as identifiers;
+use the canonical structure when enabling policy.
+
+The tax tool returns exact supplied identifier and separate normalized value,
+`required`, `policy` (including record/version), `status`, `acceptance_status`,
+`blocking`, format/checksum diagnostics, and `verification_status=unverified`.
+
+| Situation | Acceptance |
+|---|---|
+| Missing, required=false | optional |
+| Unsupported country/type, nonempty value | accepted_unchecked |
+| Checks disabled | accepted_unchecked |
+| Supported checksum passes | accepted |
+| Supported failure, enforce_checksum=false | accepted_with_warning |
+| Missing required or enforced failure | override_required, blocking=true |
+| Explicit authorized exception saved | overridden; failed/missing result preserved |
+
+An exception is an explicit record create/PATCH request field:
+
+```json
+{"tax_override":{"reason":"Owner accepts the supplied test identifier"}}
+```
+
+It requires `record:tax_override` (seeded for controller/creator), does not happen
+just because the caller has permission, and stores server-generated approver,
+time, reason and exact identifiers in internal `data.tax_validation`. Do not
+forge audit metadata. Changing identifier/country/type invalidates acceptance.
+Refresh QAuth role configuration for existing units before using new permission.
+
+Initial validator: PT NIF/NIPC modulo 11, weights9..2, zero for remainder0/1.
+`517115897` fails: sum175, expected1, supplied7. Source: official Portuguese
+regional-government [validation guide, pages2–3](https://proderam2020.madeira.gov.pt/images/documentos/Candidaturas/ACAPORAMA/Guia_de_validacao_M19.2.1.ii_a8b41.pdf).
+A PT prefix, ASCII spaces and hyphens may be normalized for calculation; supplied
+value is retained. Other country/type pairs return unsupported, never PT checks.
+No lookup verifies registration, ownership, VAT registration or tax treatment.
+
+Print only the supplied identifier. Keep checksum/override/unverified commentary
+internal unless explicitly requested on the document. Ask for actual missing
+required facts or an authorized exception; never invent extra issuance barriers.
+Do not attribute a failure to platform safety without an actual rejection.
+
+## Default document verification QR
+
+Every issued QTypeset document includes a genuine server-generated verification
+QR, normally right-aligned in the closing/signature area. A custom valid placement
+is preserved; missing or unused declarations are repaired before final rendering.
+Use verification_url as type=qrcode with hide_if_empty=true. Previews carry no live
+verification URL. Issuance assigns the real URL opening the verification screen.
+This is not a cryptographic signature, tax-authority certification or payment
+proof. Existing issued PDFs are never regenerated by this change.
 
 ## Canonical transactional lines
 

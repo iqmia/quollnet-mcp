@@ -1,3 +1,5 @@
+> Historical implementation, superseded before deployment by server-tax-policy-qr. See current data guidance and the newer spec.
+
 # MCP checksum and canonical line guidance review
 
 Implemented two authenticated read-only tools: advisory PT NIF/NIPC checks and

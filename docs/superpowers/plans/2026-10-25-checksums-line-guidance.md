@@ -1,3 +1,5 @@
+> Historical implementation, superseded before deployment by server-tax-policy-qr. See current data guidance and the newer spec.
+
 # MCP Checksums and Line Guidance Implementation Plan
 
 > **For agentic workers:** Use superpowers:executing-plans, inline.

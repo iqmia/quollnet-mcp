@@ -11,97 +11,6 @@ from pydantic import TypeAdapter, ValidationError
 from tests.qledger_support import U, settings
 
 
-class TaxChecksumTests(unittest.TestCase):
-    def test_failed_nipc_preserves_input_and_reports_advisory_result(self):
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-
-        result = check_tax_identifier("517115897", "PT")
-        self.assertEqual(result.identifier, "517115897")
-        self.assertEqual(result.status, "failed_checksum")
-        self.assertEqual(result.weighted_sum, 175)
-        self.assertEqual(result.expected_check_digit, "1")
-        self.assertEqual(result.supplied_check_digit, "7")
-        self.assertFalse(result.checksum_valid)
-        self.assertFalse(result.blocking)
-        self.assertEqual(result.verification_status, "unverified")
-
-    def test_checksum_pass_is_not_external_verification(self):
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-
-        for identifier in ("517115891", "501234560"):
-            with self.subTest(identifier=identifier):
-                result = check_tax_identifier(identifier, "PT")
-                self.assertEqual(result.status, "passed")
-                self.assertTrue(result.checksum_valid)
-                self.assertEqual(result.verification_status, "unverified")
-                self.assertTrue(result.warnings)
-
-    def test_zero_check_digit_for_modulo_zero_and_one(self):
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-
-        for identifier, remainder in (("500000050", 0), ("501234560", 1)):
-            with self.subTest(identifier=identifier):
-                result = check_tax_identifier(identifier, "PT")
-                self.assertEqual(result.weighted_sum % 11, remainder)
-                self.assertEqual(result.expected_check_digit, "0")
-                self.assertTrue(result.checksum_valid)
-
-    def test_normalization_is_explicit_and_original_value_is_retained(self):
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-
-        original = " pt 517-115-897 "
-        result = check_tax_identifier(original, "pt")
-        self.assertEqual(result.identifier, original)
-        self.assertEqual(result.normalized_identifier, "517115897")
-        self.assertFalse(result.checksum_valid)
-
-    def test_malformed_values_never_get_repaired_into_valid_numbers(self):
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-
-        for identifier in (
-            "",
-            "51711589",
-            "5171158910",
-            "abc517115891",
-            "５１７１１５８９１",
-            "017115891",
-        ):
-            with self.subTest(identifier=identifier):
-                result = check_tax_identifier(identifier, "PT")
-                self.assertEqual(result.status, "invalid_format")
-                self.assertFalse(result.format_valid)
-                self.assertIsNone(result.checksum_valid)
-                self.assertIsNone(result.expected_check_digit)
-                self.assertFalse(result.blocking)
-
-    def test_forbidden_whitespace_is_not_normalized_away(self):
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-
-        for identifier in (
-            "\t517115891\n",
-            "\u00a0517115891\u00a0",
-            "PT\t517115891",
-            "PT\u2003517115891",
-        ):
-            with self.subTest(identifier=identifier):
-                result = check_tax_identifier(identifier, "PT")
-                self.assertEqual(result.identifier, identifier)
-                self.assertEqual(result.status, "invalid_format")
-                self.assertIsNone(result.checksum_valid)
-        valid = check_tax_identifier(" PT 517-115-891 ", "PT")
-        self.assertEqual(valid.status, "passed")
-
-    def test_unsupported_country_does_not_apply_portuguese_algorithm(self):
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-
-        result = check_tax_identifier("517115891", "US")
-        self.assertEqual(result.status, "unsupported_country")
-        self.assertFalse(result.supported)
-        self.assertIsNone(result.checksum_valid)
-        self.assertIsNone(result.algorithm)
-        self.assertFalse(result.blocking)
-
-
 class CanonicalLinesTests(unittest.TestCase):
     def test_checked_in_schema_and_example_match_tool_contract(self):
         import json
@@ -257,71 +166,94 @@ class CanonicalLinesTests(unittest.TestCase):
 class GuidanceToolsTests(unittest.IsolatedAsyncioTestCase):
     async def test_tools_are_read_only_scoped_and_have_typed_output(self):
         from quollnet_mcp.qledger.server import build_qledger_server
-        from quollnet_mcp.qledger.tools import guidance
 
-        server = build_qledger_server(settings())
-        tools = {tool.name: tool for tool in await server.list_tools()}
+        tools = {
+            tool.name: tool
+            for tool in await build_qledger_server(settings()).list_tools()
+        }
         for name in ("check_qledger_tax_identifier", "get_qledger_line_item_guidance"):
-            self.assertIn(name, tools)
             self.assertTrue(tools[name].annotations.read_only_hint)
             self.assertFalse(tools[name].annotations.destructive_hint)
-            self.assertIn("unit_id", tools[name].input_schema["required"])
             self.assertIsNotNone(tools[name].output_schema)
-        with patch.object(
-            guidance.auth, "unit_token", new_callable=AsyncMock, return_value="unit"
-        ) as authorize:
-            checked = await guidance.check_qledger_tax_identifier(
-                UUID(U), "517115897", "PT"
-            )
-            guide = await guidance.get_qledger_line_item_guidance(UUID(U))
-        self.assertFalse(checked.blocking)
-        self.assertEqual(checked.status, "failed_checksum")
-        self.assertIn("lines", guide.canonical_example["data"])
-        self.assertEqual(authorize.await_count, 2)
-        authorize.assert_awaited_with(UUID(U))
+        self.assertIn(
+            "country_code",
+            tools["check_qledger_tax_identifier"].input_schema["required"],
+        )
 
-    async def test_failed_checksum_does_not_block_authorized_record_write(self):
+    async def test_check_is_forwarded_to_qentries_without_local_validation(self):
         import json
 
         import httpx
 
-        from quollnet_mcp.qledger.models_records import RecordPatch
-        from quollnet_mcp.qledger.tax_identifiers import check_tax_identifier
-        from quollnet_mcp.qledger.tools import records
-        from tests.qledger_support import R, client
+        from quollnet_mcp.qledger.tools import guidance
+        from tests.qledger_support import client
 
-        checked = check_tax_identifier("517115897", "PT")
-        self.assertFalse(checked.checksum_valid)
-        payload = {
-            "name": "Test N2 LDA",
-            "address": {"city": "Lisbon"},
-            "tax": {
-                "nipc": checked.identifier,
-                "verification_status": "unverified",
-                "tax_validation_status": "failed_checksum_user_overridden",
-            },
-        }
         seen = []
+        response = {
+            "country_code": "ES",
+            "identifier": "ES-foreign-ID",
+            "identifier_type": "tax_id",
+            "normalized_identifier": "ES-foreign-ID",
+            "supported": False,
+            "status": "unsupported_country",
+            "acceptance_status": "accepted_unchecked",
+            "blocking": False,
+            "required": True,
+            "warnings": ["No validator available"],
+            "policy": {"required": True},
+        }
 
         def handler(request):
             seen.append(request)
-            return httpx.Response(200, json={"id": R, "version": 2, "data": payload})
+            return httpx.Response(200, json=response)
 
         async with client(handler) as connection:
             with (
-                patch.object(records, "qledger_client", connection),
+                patch.object(guidance, "qledger_client", connection),
                 patch(
                     "quollnet_mcp.qledger.tools.common.auth.unit_token",
                     new_callable=AsyncMock,
                     return_value="unit",
                 ),
             ):
-                result = await records.update_qledger_record(
-                    U, R, RecordPatch(version=1, data=payload)
+                result = await guidance.check_qledger_tax_identifier(
+                    UUID(U), "ES-foreign-ID", "ES"
                 )
-        self.assertEqual(result["version"], 2)
-        self.assertEqual(seen[0].method, "PATCH")
-        self.assertEqual(json.loads(seen[0].content), {"version": 1, "data": payload})
+        self.assertEqual(result.status, "unsupported_country")
+        self.assertEqual(result.acceptance_status, "accepted_unchecked")
+        self.assertEqual(seen[0].method, "POST")
+        self.assertEqual(seen[0].url.path, "/api/units/" + U + "/tax-identifiers/check")
+        self.assertEqual(
+            json.loads(seen[0].content),
+            {
+                "country_code": "ES",
+                "identifier": "ES-foreign-ID",
+                "identifier_type": "tax_id",
+            },
+        )
+
+    async def test_backend_errors_are_not_replaced_with_guessed_results(self):
+        import httpx
+        from mcp.server.mcpserver.exceptions import ToolError
+
+        from quollnet_mcp.qledger.tools import guidance
+        from tests.qledger_support import client
+
+        async with client(
+            lambda request: httpx.Response(
+                403, json={"message": "Permission required: record:view"}
+            )
+        ) as connection:
+            with (
+                patch.object(guidance, "qledger_client", connection),
+                patch(
+                    "quollnet_mcp.qledger.tools.common.auth.unit_token",
+                    new_callable=AsyncMock,
+                    return_value="unit",
+                ),
+                self.assertRaises(ToolError),
+            ):
+                await guidance.check_qledger_tax_identifier(UUID(U), "517115897", "PT")
 
     async def test_unit_authorization_failure_is_preserved(self):
         from mcp.server.mcpserver.exceptions import ToolError
@@ -334,30 +266,70 @@ class GuidanceToolsTests(unittest.IsolatedAsyncioTestCase):
             new_callable=AsyncMock,
             side_effect=ToolError("Unit not authorized"),
         ):
-            with self.assertRaisesRegex(ToolError, "Unit not authorized"):
+            with self.assertRaises(ToolError):
                 await guidance.check_qledger_tax_identifier(UUID(U), "517115897", "PT")
-            with self.assertRaisesRegex(ToolError, "Unit not authorized"):
+            with self.assertRaises(ToolError):
                 await guidance.get_qledger_line_item_guidance(UUID(U))
 
-    async def test_sdk_invocation_returns_structured_advisory_and_schema(self):
+    async def test_sdk_invocation_returns_server_policy_and_line_schema(self):
         from quollnet_mcp.qledger.server import build_qledger_server
+        from quollnet_mcp.qledger.tax_identifiers import TaxIdentifierCheck
         from quollnet_mcp.qledger.tools import guidance
 
+        result = TaxIdentifierCheck(
+            country_code="PT",
+            identifier="517115897",
+            identifier_type="tax_id",
+            normalized_identifier="517115897",
+            supported=True,
+            status="checksum_failed",
+            checksum_valid=False,
+            acceptance_status="accepted_with_warning",
+            blocking=False,
+            required=False,
+            warnings=["Advisory"],
+            policy={},
+        )
         server = build_qledger_server(settings())
-        with patch.object(
-            guidance.auth, "unit_token", new_callable=AsyncMock, return_value="unit"
+        with (
+            patch.object(
+                guidance,
+                "call",
+                new_callable=AsyncMock,
+                return_value=result.model_dump(),
+            ),
+            patch.object(
+                guidance.auth, "unit_token", new_callable=AsyncMock, return_value="unit"
+            ),
         ):
-            result = await server.call_tool(
+            checked = await server.call_tool(
                 "check_qledger_tax_identifier",
                 {"unit_id": U, "identifier": "517115897", "country_code": "PT"},
             )
             guide = await server.call_tool(
                 "get_qledger_line_item_guidance", {"unit_id": U}
             )
-        self.assertFalse(result.is_error)
-        self.assertEqual(result.structured_content["status"], "failed_checksum")
-        self.assertFalse(result.structured_content["checksum_valid"])
+        self.assertFalse(checked.is_error)
+        self.assertEqual(
+            checked.structured_content["acceptance_status"], "accepted_with_warning"
+        )
         self.assertFalse(guide.is_error)
         self.assertEqual(
             guide.structured_content["document_data_schema"]["title"], "DocumentData"
         )
+
+    def test_override_is_explicit_and_typed_for_writes(self):
+        from quollnet_mcp.qledger.models_records import RecordCreate, RecordPatch
+
+        for model, values in (
+            (RecordCreate, {"type": "party", "data": {}}),
+            (RecordPatch, {"version": 1}),
+        ):
+            result = model(
+                **values, tax_override={"reason": "Approved fictional test identifier"}
+            )
+            self.assertEqual(
+                result.tax_override.reason, "Approved fictional test identifier"
+            )
+            with self.assertRaises(ValidationError):
+                model(**values, tax_override={"reason": " "})

@@ -1,3 +1,5 @@
+> Historical implementation, superseded before deployment by server-tax-policy-qr. See current data guidance and the newer spec.
+
 # MCP tax checks and canonical document lines
 
 Implement the user's requested MCP checksum checks and unambiguous line-item
