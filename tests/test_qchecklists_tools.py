@@ -22,8 +22,15 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
 
         async def respond(request):
             self.requests.append(request)
-            if request.method == "GET" and request.url.path.endswith("/cl-1"):
-                data = {"revision": REVISION, "items": [
+            if request.method == "GET" and request.url.path.endswith("/attachments/att-1"):
+                data = {"id": "att-1", "owner_type": "checklist", "owner_id": "cl-1",
+                        "file_name": "guide.webp", "file_type": "image/webp",
+                        "file_url": "https://example.test/file/guide.webp", "alt_text": "Guide"}
+            elif request.method == "GET" and request.url.path.endswith("/attachments"):
+                data = [{"id": "att-1", "owner_type": "checklist", "owner_id": "cl-1"}]
+            elif request.method == "GET" and request.url.path.endswith("/cl-1"):
+                data = {"revision": REVISION, "is_posted": False, "hero_image": None,
+                        "call_to_action_urls": [{"text": "Download PDF", "url": "https://example.test/auto.pdf"}], "items": [
                     {"id": "one", "text": "Check access", "position": 1, "items_title": None},
                     {"id": "two", "text": "Check level", "position": 2, "items_title": "Print"},
                     {"id": "three", "text": "Check plant", "position": 3, "items_title": None},
@@ -65,6 +72,83 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
         self.assertIs(body["editorial_draft"], True)
         self.assertEqual(body["items"], [{"text": "Check print bed", "position": 1}])
 
+    async def test_hero_prompt_is_part_of_create_and_update_contract(self):
+        await tools.create_checklist(
+            tools.ChecklistCreate(name="Before printing", categories=["construction"],
+                                  main_image_prompt="A close-up of a 3D printer inspecting the bed"),
+            [tools.ChecklistItemCreate(text="Check print bed")],
+        )
+        self.assertEqual(json.loads(self.requests[-1].content)["main_image_prompt"],
+                         "A close-up of a 3D printer inspecting the bed")
+        self.requests.clear()
+        await tools.update_checklist("cl-1", REVISION, tools.ChecklistMetadata(
+            main_image_prompt="Technician calibrating a 3D printer"))
+        self.assertEqual(json.loads(self.requests[-1].content)["main_image_prompt"],
+                         "Technician calibrating a 3D printer")
+        self.assertEqual(self.requests[-1].headers["If-Match"], f'"{REVISION}"')
+
+    async def test_list_uploaded_files(self):
+        result = await tools.list_checklist_files("cl-1")
+        self.assertEqual(result["data"][0]["id"], "att-1")
+        self.assertEqual(self.requests[-1].url.params["owner_type"], "checklist")
+        self.assertEqual(self.requests[-1].url.params["owner_id"], "cl-1")
+
+    async def test_add_file_uses_authorized_file_transfer_and_multipart(self):
+        file = tools.FileInput(download_url="https://files.oaiusercontent.com/signed",
+                               file_id="file-1", file_name="guide.pdf", mime_type="application/pdf")
+        with patch.object(tools, "download_file", new_callable=AsyncMock,
+                          return_value=("guide.pdf", b"PDF CONTENT", "application/pdf")) as fetch:
+            await tools.add_checklist_file("cl-1", REVISION, file, description="Installation guide")
+        fetch.assert_awaited_once_with(file, max_bytes=tools.MAX_CHECKLIST_FILE_BYTES)
+        request = self.requests[-1]
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.url.path, "/chk/v1/attachments")
+        self.assertIn(b"PDF CONTENT", request.content)
+        self.assertIn(b' name="owner_type"', request.content)
+        self.assertIn(b"Installation guide", request.content)
+
+    async def test_set_hero_requires_image_owned_by_checklist(self):
+        await tools.set_checklist_hero("cl-1", REVISION, "att-1")
+        patch_request = self.requests[-1]
+        self.assertEqual(patch_request.method, "PATCH")
+        self.assertEqual(json.loads(patch_request.content),
+                         {"hero_image": "guide.webp", "hero_image_alt": "Guide"})
+        self.assertEqual(patch_request.headers["If-Match"], f'"{REVISION}"')
+
+    async def test_set_cta_preserves_generated_links_and_can_remove_only_custom(self):
+        await tools.set_checklist_cta("cl-1", REVISION, "att-1", "Download guide")
+        links = json.loads(self.requests[-1].content)["call_to_action_urls"]
+        self.assertEqual(len(links), 2)
+        self.assertEqual(links[0]["text"], "Download PDF")
+        self.assertEqual(links[1]["attachment_id"], "att-1")
+        self.requests.clear()
+        await tools.set_checklist_cta("cl-1", REVISION, "att-1", enabled=False)
+        self.assertEqual(json.loads(self.requests[-1].content)["call_to_action_urls"],
+                         [{"text": "Download PDF", "url": "https://example.test/auto.pdf"}])
+
+    async def test_remove_clears_hero_and_custom_link_before_delete(self):
+        current = {"revision": REVISION, "is_posted": False, "hero_image": "guide.webp",
+                   "call_to_action_urls": [
+                       {"text": "Download PDF", "url": "https://example.test/auto.pdf"},
+                       {"text": "Guide", "url": "https://example.test/file/guide.webp",
+                        "attachment_id": "att-1"}]}
+        original = tools._request
+
+        async def wrapped(client, method, path, **kwargs):
+            if method == "GET" and path == "v1/checklists/cl-1":
+                return {"data": current}
+            return await original(client, method, path, **kwargs)
+
+        with patch.object(tools, "_request", side_effect=wrapped):
+            await tools.remove_checklist_file("cl-1", REVISION, "att-1")
+        patch_request = next(req for req in self.requests if req.method == "PATCH")
+        self.assertEqual(json.loads(patch_request.content),
+                         {"hero_image": None, "hero_image_alt": None,
+                          "call_to_action_urls": [{"text": "Download PDF",
+                                                   "url": "https://example.test/auto.pdf"}]})
+        self.assertEqual(self.requests[-1].method, "DELETE")
+        self.assertEqual(self.requests[-1].url.path, "/chk/v1/attachments/att-1")
+
     async def test_item_edits_preserve_ids_and_send_revision(self):
         await tools.edit_checklist_items(
             "cl-1", REVISION,
@@ -88,14 +172,16 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.requests[0].url.path, "/chk/v1/checklists/cl-1/publish")
         self.assertEqual(self.requests[0].headers["If-Match"], f'"{REVISION}"')
 
-    async def test_all_eight_tools_have_oauth_and_correct_read_only_hints(self):
+    async def test_all_thirteen_tools_have_oauth_and_correct_read_only_hints(self):
         server = MCPServer("checklists-test")
         tools.register_checklist_tools(server)
         registered = {tool.name: tool for tool in await server.list_tools()}
         self.assertEqual(set(registered), {
             "search_checklists", "get_checklist", "create_checklist", "update_checklist",
             "edit_checklist_items", "validate_checklist", "publish_checklist", "unpublish_checklist",
+            "list_checklist_files", "add_checklist_file", "remove_checklist_file",
+            "set_checklist_hero", "set_checklist_cta",
         })
         for name, tool in registered.items():
             self.assertEqual(tool.annotations.read_only_hint,
-                             name in {"search_checklists", "get_checklist", "validate_checklist"})
+                             name in {"search_checklists", "get_checklist", "validate_checklist", "list_checklist_files"})
