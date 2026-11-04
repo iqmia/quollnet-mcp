@@ -23,6 +23,9 @@ class Settings:
     qauth_app_id: str
     qauth_public_key: str
     qapp_app_id: str
+    qchecklists_app_id: str = ""
+    qchecklists_base_url: str = "https://quollnet.com/chk"
+    qchecklists_timeout_seconds: float = 180
     qledger_enabled: bool = False
     qledger_app_id: str = ""
     qledger_base_url: str = ""
@@ -76,7 +79,15 @@ def get_settings() -> Settings:
             "QLedger file limit must be 1–10485760 and batch limit at least the file limit"
         )
 
+    qchecklists_app_id = os.getenv("QCHECKLISTS_APP_ID", "").strip()
+    qchecklists_timeout = float(os.getenv("QCHECKLISTS_TIMEOUT_SECONDS", "180")) if qchecklists_app_id else 180
+    if not math.isfinite(qchecklists_timeout) or qchecklists_timeout <= 0:
+        raise ValueError("QCHECKLISTS_TIMEOUT_SECONDS must be finite and positive")
+
     return Settings(
+        qchecklists_app_id=qchecklists_app_id,
+        qchecklists_base_url=os.getenv("QCHECKLISTS_BASE_URL", "https://quollnet.com/chk"),
+        qchecklists_timeout_seconds=qchecklists_timeout,
         qledger_enabled=qledger_enabled,
         qledger_app_id=os.getenv("QLEDGER_APP_ID", ""),
         qledger_base_url=os.getenv("QLEDGER_BASE_URL", ""),

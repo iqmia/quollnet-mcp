@@ -82,6 +82,31 @@ QAuth's canonical token-exchange design is maintained in:
 
 `iqmia/q_auth/design-docs/mcp-authentication-implementation.md`
 
+## qChecklists
+
+Set `QCHECKLISTS_APP_ID` to the qChecklists application ID in QAuth to register
+the eight checklist tools on the existing `/mcp` resource. The default
+`QCHECKLISTS_BASE_URL` is `https://quollnet.com/chk`. Deploy the updated
+qChecklists API before enabling these tools.
+
+In QAuth, enable **Allow access through Quollnet MCP** for the qChecklists
+registration. The target must be open or shared-key. Shared-key access requires
+an active target membership. The gateway exchanges the connected user's
+existing MCP access token for a qChecklists user token through QAuth. No
+checklist service key or separate MCP login is used.
+
+- Use `search_checklists` and `get_checklist` to find templates and their current revisions.
+- Use `create_checklist` to save a private draft for a single inspection visit or stage.
+- Use `update_checklist` for metadata and guidance, or `edit_checklist_items`
+  for additions, edits, deletions and reordering by stable item ID.
+- Use `validate_checklist` before `publish_checklist`. Pass the validated
+  revision and explicitly choose public or private visibility.
+- Use `unpublish_checklist` to withdraw a publication to a private draft
+  before editing it again.
+
+Use the latest revision for each write. If qChecklists reports a stale revision,
+reload the template and review the changed content before retrying.
+
 ## QArticles
 
 QArticles tools exchange the connected MCP identity for a normal qApp user

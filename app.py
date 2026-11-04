@@ -15,6 +15,7 @@ from quollnet_mcp.auth import QAuthTokenVerifier
 from quollnet_mcp.config import get_settings
 from quollnet_mcp.instructions import SERVER_INSTRUCTIONS
 from quollnet_mcp.tools.article_lifecycle import register_article_lifecycle_tools
+from quollnet_mcp.tools.checklists import register_checklist_tools
 from quollnet_mcp.tools.articles import (
     accept_valrig_article_candidate,
     create_article_draft,
@@ -53,7 +54,12 @@ settings = get_settings()
 mcp = MCPServer(
     SERVICE_NAME,
     version=SERVICE_VERSION,
-    instructions=SERVER_INSTRUCTIONS,
+    instructions=SERVER_INSTRUCTIONS + (
+        "- For qChecklists, work on one checklist per inspection visit or work stage. "
+        "Create a private draft, use the latest revision for edits, and validate before publishing. "
+        "Publish or withdraw only when the user requests it.\n"
+        if settings.qchecklists_app_id else ""
+    ),
     token_verifier=QAuthTokenVerifier(
         issuer_url=settings.qauth_issuer_url,
         resource_uri=settings.mcp_resource_uri,
@@ -67,6 +73,8 @@ mcp = MCPServer(
     ),
 )
 register_article_lifecycle_tools(mcp)
+if settings.qchecklists_app_id:
+    register_checklist_tools(mcp)
 
 # Define a function to return the current service status, including the service 
 # name, version, and status.
