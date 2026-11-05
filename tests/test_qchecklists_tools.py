@@ -116,7 +116,7 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
             filename="generated-hero.png",
             mime_type="image/png",
         )
-        original_png = b"\\x89PNG\\r\\n\\x1a\\n" + b"generated-image-test-bytes"
+        original_png = b"\x89PNG\r\n\x1a\n" + b"generated-image-test-bytes"
         with patch.object(
             tools, "download_file", new_callable=AsyncMock,
             return_value=("generated-hero.png", original_png, "image/png"),
