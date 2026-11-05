@@ -134,6 +134,36 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn(original_png, request.content)
         self.assertIn(b"Generated checklist hero", request.content)
 
+    async def test_generated_image_without_filename_gets_usable_extension(self):
+        generated = tools.FileInput(
+            file_id="file_generated_unnamed",
+            download_url="https://files.oaiusercontent.com/authorized-generated-image",
+            mime_type="image/png",
+        )
+        png = b"\x89PNG\r\n\x1a\n" + b"image-bytes"
+        with patch.object(
+            tools, "download_file", new_callable=AsyncMock,
+            return_value=("upload.bin", png, "image/png"),
+        ):
+            await tools.add_checklist_file("cl-1", REVISION, generated)
+        request = self.requests[-1]
+        self.assertIn(b"chatgpt-upload.png", request.content)
+        self.assertIn(png, request.content)
+
+    async def test_reject_invalid_generated_image_before_upload(self):
+        generated = tools.FileInput(
+            file_id="file_generated_invalid",
+            download_url="https://files.oaiusercontent.com/authorized-generated-image",
+            mime_type="image/png",
+        )
+        with patch.object(
+            tools, "download_file", new_callable=AsyncMock,
+            return_value=("image.png", b"not really a PNG", "image/png"),
+        ):
+            with self.assertRaisesRegex(Exception, "valid PNG header"):
+                await tools.add_checklist_file("cl-1", REVISION, generated)
+        self.assertFalse(any(req.method == "POST" for req in self.requests))
+
     async def test_generated_image_file_requires_authorized_url(self):
         from pydantic import ValidationError
 
