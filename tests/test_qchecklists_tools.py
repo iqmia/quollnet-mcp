@@ -107,6 +107,39 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
         self.assertIn(b' name="owner_type"', request.content)
         self.assertIn(b"Installation guide", request.content)
 
+    async def test_generated_image_file_uses_authorized_transfer_as_multipart(self):
+        # A ChatGPT-generated image is transferable only when the host supplies
+        # the authorized URL, not merely the image's file ID.
+        generated = tools.FileInput(
+            file_id="file_generated_hero",
+            download_url="https://files.oaiusercontent.com/authorized-generated-image",
+            filename="generated-hero.png",
+            mime_type="image/png",
+        )
+        original_png = b"\\x89PNG\\r\\n\\x1a\\n" + b"generated-image-test-bytes"
+        with patch.object(
+            tools, "download_file", new_callable=AsyncMock,
+            return_value=("generated-hero.png", original_png, "image/png"),
+        ) as fetch:
+            await tools.add_checklist_file(
+                "cl-1", REVISION, generated, alt_text="Generated checklist hero",
+            )
+        fetch.assert_awaited_once_with(
+            generated, max_bytes=tools.MAX_CHECKLIST_FILE_BYTES,
+        )
+        request = self.requests[-1]
+        self.assertEqual(request.url.path, "/chk/v1/attachments")
+        self.assertIn(b"generated-hero.png", request.content)
+        self.assertIn(b"image/png", request.content)
+        self.assertIn(original_png, request.content)
+        self.assertIn(b"Generated checklist hero", request.content)
+
+    async def test_generated_image_file_requires_authorized_url(self):
+        from pydantic import ValidationError
+
+        with self.assertRaises(ValidationError):
+            tools.FileInput(file_id="file_generated_hero")
+
     async def test_set_hero_requires_image_owned_by_checklist(self):
         await tools.set_checklist_hero("cl-1", REVISION, "att-1")
         patch_request = self.requests[-1]
@@ -185,3 +218,13 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
         for name, tool in registered.items():
             self.assertEqual(tool.annotations.read_only_hint,
                              name in {"search_checklists", "get_checklist", "validate_checklist", "list_checklist_files"})
+            if name == "add_checklist_file":
+                self.assertEqual(tool.meta["openai/fileParams"], ["file"])
+                schema = tool.input_schema["$defs"]["FileInput"]
+                self.assertEqual(set(schema["required"]), {"download_url", "file_id"})
+                self.assertTrue(
+                    {"download_url", "file_id", "mime_type", "file_name", "filename"}
+                    <= set(schema["properties"])
+                )
+            else:
+                self.assertNotIn("openai/fileParams", tool.meta)
