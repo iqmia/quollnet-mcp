@@ -19,6 +19,37 @@ from quollnet_mcp.services.qauth_client import QAuthClientError
 CHECKLISTS = "v1/checklists"
 ATTACHMENTS = "v1/attachments"
 MAX_CHECKLIST_FILE_BYTES = 20 * 1024 * 1024
+
+# Generated images can arrive without a filename. The shared downloader uses
+# "upload.bin" in that case, which qChecklists rejects as an unsupported type.
+CHECKLIST_FILE_EXTENSIONS = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "application/pdf": "pdf",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+}
+
+
+def _upload_filename(name: str, content: bytes, mime: str) -> str:
+    """Give unnamed ChatGPT files a supported extension and check common image signatures."""
+    if mime == "image/png" and not content.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        raise ToolError("Downloaded file does not contain a valid PNG header")
+    if mime == "image/jpeg" and not content.startswith(b"\\xff\\xd8\\xff"):
+        raise ToolError("Downloaded file does not contain a valid JPEG header")
+    if mime == "image/webp" and not (
+        content.startswith(b"RIFF") and content[8:12] == b"WEBP"
+    ):
+        raise ToolError("Downloaded file does not contain a valid WebP header")
+    if mime == "image/gif" and not content.startswith((b"GIF87a", b"GIF89a")):
+        raise ToolError("Downloaded file does not contain a valid GIF header")
+    if name == "upload.bin":
+        extension = CHECKLIST_FILE_EXTENSIONS.get(mime)
+        if extension is None:
+            raise ToolError("ChatGPT did not provide a supported filename or file type")
+        return f"chatgpt-upload.{extension}"
+    return name
 AttachmentId = Annotated[str, Field(min_length=1, max_length=50)]
 ChecklistId = Annotated[str, Field(min_length=1, max_length=36)]
 Revision = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$",
@@ -284,6 +315,7 @@ async def add_checklist_file(
             name, contents, mime = await download_file(file, max_bytes=MAX_CHECKLIST_FILE_BYTES)
         except ValueError as error:
             raise ToolError(str(error)) from None
+        name = _upload_filename(name, contents, mime)
         fields = {"owner_type": "checklist", "owner_id": checklist_id}
         if document_type is not None:
             fields["document_type"] = document_type
