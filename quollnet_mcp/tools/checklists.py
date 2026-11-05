@@ -384,5 +384,8 @@ def register_checklist_tools(mcp: MCPServer) -> None:
             annotations=ToolAnnotations(read_only_hint=read_only,
                                         destructive_hint=destructive,
                                         open_world_hint=tool in (publish_checklist, unpublish_checklist)),
-            meta={"securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}]},
+            meta={
+                **({"openai/fileParams": ["file"]} if tool is add_checklist_file else {}),
+                "securitySchemes": [{"type": "oauth2", "scopes": ["mcp:connect"]}],
+            },
         )(tool)
