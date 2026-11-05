@@ -34,9 +34,9 @@ CHECKLIST_FILE_EXTENSIONS = {
 
 def _upload_filename(name: str, content: bytes, mime: str) -> str:
     """Give unnamed ChatGPT files a supported extension and check common image signatures."""
-    if mime == "image/png" and not content.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+    if mime == "image/png" and not content.startswith(b"\x89PNG\r\n\x1a\n"):
         raise ToolError("Downloaded file does not contain a valid PNG header")
-    if mime == "image/jpeg" and not content.startswith(b"\\xff\\xd8\\xff"):
+    if mime == "image/jpeg" and not content.startswith(b"\xff\xd8\xff"):
         raise ToolError("Downloaded file does not contain a valid JPEG header")
     if mime == "image/webp" and not (
         content.startswith(b"RIFF") and content[8:12] == b"WEBP"
@@ -50,6 +50,8 @@ def _upload_filename(name: str, content: bytes, mime: str) -> str:
             raise ToolError("ChatGPT did not provide a supported filename or file type")
         return f"chatgpt-upload.{extension}"
     return name
+
+
 AttachmentId = Annotated[str, Field(min_length=1, max_length=50)]
 ChecklistId = Annotated[str, Field(min_length=1, max_length=36)]
 Revision = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$",
