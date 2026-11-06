@@ -79,9 +79,15 @@ class ChecklistMetadata(BaseModel):
     call_to_action_title: str | None = None
     call_to_action_paragraph: str | None = None
     is_compact: bool | None = None
+    is_public: bool | None = Field(
+        default=None,
+        description="Intended draft visibility: true=Public Draft (owner-only until posted); false=Private Draft. Publication uses publish_checklist.",
+    )
 
 
 class ChecklistCreate(ChecklistMetadata):
+    # Creation through MCP always starts in a private draft.
+    is_public: Literal[False] = False
     name: str = Field(min_length=1)
     categories: list[str]
     slug: str | None = None
@@ -273,7 +279,7 @@ async def publish_checklist(checklist_id: ChecklistId, expected_revision: Revisi
 
 
 async def unpublish_checklist(checklist_id: ChecklistId, expected_revision: Revision) -> dict[str, Any]:
-    """Withdraw an owned checklist and its public download links, leaving a private draft."""
+    """Withdraw an owned posted checklist to a draft, preserving is_public. A Public Draft is owner-only."""
     async with _checklists_client() as client:
         return await _request(client, "POST", f"{_detail(checklist_id)}/unpublish",
                               revision=expected_revision)
