@@ -87,6 +87,23 @@ class TestChecklistTools(unittest.IsolatedAsyncioTestCase):
                          "Technician calibrating a 3D printer")
         self.assertEqual(self.requests[-1].headers["If-Match"], f'"{REVISION}"')
 
+    async def test_draft_visibility_is_editable_without_posting(self):
+        await tools.update_checklist(
+            "cl-1", REVISION, tools.ChecklistMetadata(is_public=True),
+        )
+        request = self.requests[-1]
+        self.assertEqual(request.method, "PATCH")
+        self.assertEqual(json.loads(request.content), {"is_public": True})
+        self.assertEqual(request.headers["If-Match"], f'"{REVISION}"')
+
+    async def test_unpublish_preserves_visibility_server_side(self):
+        await tools.unpublish_checklist("cl-1", REVISION)
+        request = self.requests[-1]
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(request.url.path, "/chk/v1/checklists/cl-1/unpublish")
+        self.assertEqual(request.headers["If-Match"], f'"{REVISION}"')
+        self.assertNotIn("is_public", request.content.decode())
+
     async def test_list_uploaded_files(self):
         result = await tools.list_checklist_files("cl-1")
         self.assertEqual(result["data"][0]["id"], "att-1")
