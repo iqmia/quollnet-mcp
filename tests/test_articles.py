@@ -12,7 +12,7 @@ os.environ.setdefault("CASHFLOWPOT_APP_ID", "cashflowpot-test-app")
 
 from mcp.server.mcpserver.exceptions import ToolError
 from quollnet_mcp.services.article_authoring import build_authoring_data
-from quollnet_mcp.services.qapp_client import QAppClientError
+from quollnet_mcp.services.qapp_client import QAppClient, QAppClientError
 from quollnet_mcp.tools.articles import (
     accept_valrig_article_candidate,
     create_article_draft,
@@ -684,6 +684,7 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
             file_name="photo.png",
             file_bytes=raw,
             convert_to_webp=True,
+            prepare_for_social_media=True,
         )
 
     async def test_convert_to_webp_defaults_true_and_forwarded(self) -> None:
@@ -706,6 +707,53 @@ class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
 
         _call_kwargs = upload.call_args.kwargs
         self.assertFalse(_call_kwargs["convert_to_webp"])
+
+    async def test_prepare_for_social_media_opt_out_forwarded(self) -> None:
+        raw = b"video bytes"
+        with (
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
+            patch(
+                "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
+                new=AsyncMock(return_value={}),
+            ) as upload,
+        ):
+            await upload_article_file(
+                article_id="art-1",
+                file_name="clip.mp4",
+                file_base64=base64.b64encode(raw).decode(),
+                prepare_for_social_media=False,
+            )
+        upload.assert_awaited_once_with(
+            access_token="qapp-user-token",
+            article_id="art-1",
+            file_name="clip.mp4",
+            file_bytes=raw,
+            convert_to_webp=True,
+            prepare_for_social_media=False,
+        )
+
+    async def test_client_sends_preparation_flag_as_multipart_text(self) -> None:
+        client = QAppClient(settings=SimpleNamespace())
+        for kwargs, expected in (({}, "true"),
+                                 ({"prepare_for_social_media": True}, "true"),
+                                 ({"prepare_for_social_media": False}, "false")):
+            with self.subTest(kwargs=kwargs):
+                with patch.object(client, "post_file", new=AsyncMock(return_value={})) as post:
+                    await client.upload_article_file(
+                        access_token="qapp-user-token",
+                        article_id="art-1",
+                        file_name="clip.mp4",
+                        file_bytes=b"video bytes",
+                        convert_to_webp=False,
+                        **kwargs,
+                    )
+                post.assert_awaited_once_with(
+                    "/articles/api/v1/articles/art-1/files",
+                    file_name="clip.mp4",
+                    file_bytes=b"video bytes",
+                    form_data={"convert-to-webp": "no", "prepare_for_social_media": expected},
+                    access_token="qapp-user-token",
+                )
 
     async def test_invalid_base64_raises_tool_error(self) -> None:
         with (
