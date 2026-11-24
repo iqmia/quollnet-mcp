@@ -1,10 +1,12 @@
-import base64
+import mimetypes
 from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ConfigDict, Field
 
 from quollnet_mcp.dependencies import qapp_client
+from quollnet_mcp.qledger.files import download_file
+from quollnet_mcp.qledger.models import FileInput
 from quollnet_mcp.services.qapp_client import QAppClientError
 from quollnet_mcp.services.article_authoring import build_authoring_data, merge_authoring_data_for_edit
 from quollnet_mcp.tools.qapp_auth import qapp_user_token
@@ -698,81 +700,64 @@ async def replace_article_body_text(
         raise ToolError(str(error)) from error
 
 
+MAX_ARTICLE_FILE_BYTES = 100 * 1024 * 1024
+
+
 async def upload_article_file(
-    article_id: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=250,
-            description="ID of the article to upload the file to.",
-        ),
-    ],
-    file_name: Annotated[
-        str,
-        Field(
-            min_length=1,
-            max_length=500,
-            description=(
-                "Desired filename for the upload, before any qApp WebP conversion. "
-                "The returned filename may differ if conversion changes the extension."
-            ),
-        ),
-    ],
-    file_base64: Annotated[
-        str,
-        Field(
-            min_length=1,
-            description=(
-                "Base64-encoded raw file bytes. Do not include a data-URI prefix "
-                "such as 'data:image/png;base64,' — provide the base64 content only."
-            ),
-        ),
-    ],
+    article_id: Annotated[str, Field(min_length=1, max_length=250)],
+    file: FileInput,
     convert_to_webp: Annotated[
         bool,
-        Field(
-            description=(
-                "When True (default) qApp converts images to WebP at quality 70. "
-                "Set to False to preserve the original image format."
-            ),
-        ),
+        Field(description="Convert images to WebP (default); false preserves the image."),
     ] = True,
     prepare_for_social_media: Annotated[
-        bool,
-        Field(
-            description=(
-                "When True (default), qApp queues original MP4 files for social media "
-                "preparation. Set to False to store a video as an ordinary attachment. "
-                "This does not publish the video and has no effect on non-MP4 files."
-            ),
-        ),
-    ] = True,
+        bool | None,
+        Field(description=(
+            "Omit to prepare original MP4s automatically. False opts out. "
+            "Non-MP4 files are never prepared. Uploading does not itself publish."
+        )),
+    ] = None,
+    file_name: Annotated[
+        str | None,
+        Field(min_length=1, max_length=255, description="Optional safe destination filename."),
+    ] = None,
 ) -> dict[str, Any]:
-    """Upload a file to a Quollnet article's file folder. Images are converted to
-    WebP by qApp by default; set convert_to_webp=false when the original image
-    format must be preserved. The returned filename and URL are authoritative
-    because image conversion may change the filename extension. Use
-    list_article_files afterwards when file discovery is needed. Original MP4s
-    are queued for preparation by default; set prepare_for_social_media=False
-    for ordinary video attachments. Uploading does not itself publish a video."""
+    """Transfer an authorized ChatGPT file as multipart to an article.
+
+    Supports original MP4 videos and other qApp-allowed attachments.
+    Use the returned stored filename and URL. Never reconstruct file bytes.
+    """
     access_token = await qapp_user_token()
-
     try:
-        file_bytes = base64.b64decode(file_base64, validate=True)
-    except Exception as error:
-        raise ToolError("Invalid base64 file content") from error
+        name, file_bytes, mime = await download_file(file, max_bytes=MAX_ARTICLE_FILE_BYTES)
+    except ValueError as error:
+        raise ToolError(str(error)) from None
 
-    if not file_bytes:
-        raise ToolError("Uploaded file is empty")
+    if file_name is not None:
+        if (
+            file_name in (".", "..")
+            or any(c in file_name for c in "/\\")
+            or any(ord(c) < 32 or ord(c) == 127 for c in file_name)
+        ):
+            raise ToolError("Supply a safe filename without paths or control characters")
+        name = file_name
+    elif name == "upload.bin":
+        extension = mimetypes.guess_extension(mime)
+        if not extension or extension == ".bin":
+            raise ToolError("Supply a filename with the original file extension")
+        name = "chatgpt-upload" + extension
 
+    # qApp independently enforces the same eligibility rule after sanitizing.
+    eligible_video = name.lower().endswith(".mp4") and not name.lower().endswith("_quollnet.mp4")
+    prepare = eligible_video and prepare_for_social_media is not False
     try:
         return await qapp_client.upload_article_file(
             access_token=access_token,
             article_id=article_id,
-            file_name=file_name,
+            file_name=name,
             file_bytes=file_bytes,
             convert_to_webp=convert_to_webp,
-            prepare_for_social_media=prepare_for_social_media,
+            prepare_for_social_media=prepare,
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
