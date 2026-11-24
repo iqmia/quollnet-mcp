@@ -602,7 +602,9 @@ mcp.tool(
     name="upload_article_file",
     title="Upload Quollnet article file",
     description=(
-        "Upload a file to a Quollnet article's file folder. Images are converted to "
+        "Transfer an authorized ChatGPT file reference to a Quollnet article via multipart. "
+        "Supports MP4 videos and ordinary attachments up to 100 MiB (backend limits also apply). "
+        "Use the actual file reference, never base64. Images are converted to "
         "WebP by qApp by default; set convert_to_webp=false when the original image "
         "format must be preserved. The returned filename and URL are authoritative "
         "because image conversion may change the filename extension. Use "
@@ -623,6 +625,7 @@ mcp.tool(
                 "scopes": ["mcp:connect"],
             }
         ],
+        "openai/fileParams": ["file"],
         "openai/toolInvocation/invoking": "Uploading article file",
         "openai/toolInvocation/invoked": "Article file uploaded",
     },
