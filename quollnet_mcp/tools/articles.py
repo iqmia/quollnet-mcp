@@ -737,12 +737,24 @@ async def upload_article_file(
             ),
         ),
     ] = True,
+    prepare_for_social_media: Annotated[
+        bool,
+        Field(
+            description=(
+                "When True (default), qApp queues original MP4 files for social media "
+                "preparation. Set to False to store a video as an ordinary attachment. "
+                "This does not publish the video and has no effect on non-MP4 files."
+            ),
+        ),
+    ] = True,
 ) -> dict[str, Any]:
     """Upload a file to a Quollnet article's file folder. Images are converted to
     WebP by qApp by default; set convert_to_webp=false when the original image
     format must be preserved. The returned filename and URL are authoritative
     because image conversion may change the filename extension. Use
-    list_article_files afterwards when file discovery is needed."""
+    list_article_files afterwards when file discovery is needed. Original MP4s
+    are queued for preparation by default; set prepare_for_social_media=False
+    for ordinary video attachments. Uploading does not itself publish a video."""
     access_token = await qapp_user_token()
 
     try:
@@ -760,6 +772,7 @@ async def upload_article_file(
             file_name=file_name,
             file_bytes=file_bytes,
             convert_to_webp=convert_to_webp,
+            prepare_for_social_media=prepare_for_social_media,
         )
     except QAppClientError as error:
         raise ToolError(str(error)) from error
