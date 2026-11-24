@@ -13,6 +13,9 @@ os.environ.setdefault("CASHFLOWPOT_APP_ID", "cashflowpot-test-app")
 from mcp.server.mcpserver.exceptions import ToolError
 from quollnet_mcp.services.article_authoring import build_authoring_data
 from quollnet_mcp.services.qapp_client import QAppClient, QAppClientError
+from quollnet_mcp.qledger.models import FileInput
+from quollnet_mcp.tools.articles import MAX_ARTICLE_FILE_BYTES
+import httpx
 from quollnet_mcp.tools.articles import (
     accept_valrig_article_candidate,
     create_article_draft,
@@ -655,117 +658,104 @@ class ReplaceArticleBodyTextTests(unittest.IsolatedAsyncioTestCase):
                 )
 
 
-import base64
-
-
 class UploadArticleFileTests(unittest.IsolatedAsyncioTestCase):
-    async def test_valid_base64_decoded_and_forwarded(self) -> None:
-        raw = b"fake image bytes"
-        encoded = base64.b64encode(raw).decode()
-        expected = {"message": "File uploaded", "data": {"name": "photo.webp", "url": "https://cdn.example.com/photo.webp"}}
-
-        with (
-            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
-            patch(
-                "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
-                new=AsyncMock(return_value=expected),
-            ) as upload,
+    async def test_file_reference_and_conditional_preparation(self) -> None:
+        for name, mime, flag, expected in (
+            ("photo.png", "image/png", None, False),
+            ("guide.pdf", "application/pdf", True, False),
+            ("clip.mp4", "video/mp4", None, True),
+            ("clip.MP4", "video/mp4", True, True),
+            ("clip.mp4", "video/mp4", False, False),
+            ("clip_quollnet.mp4", "video/mp4", None, False),
         ):
-            result = await upload_article_file(
-                article_id="art-1",
-                file_name="photo.png",
-                file_base64=encoded,
-            )
+            with self.subTest(name=name, flag=flag):
+                file = FileInput(
+                    file_id="file-1", download_url="https://files.oaiusercontent.com/signed",
+                    file_name=name, mime_type=mime,
+                )
+                with (
+                    patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
+                    patch("quollnet_mcp.tools.articles.download_file",
+                          new=AsyncMock(return_value=(name, b"original bytes", mime))) as fetch,
+                    patch("quollnet_mcp.tools.articles.qapp_client.upload_article_file",
+                          new=AsyncMock(return_value={"data": {"name": name}})) as upload,
+                ):
+                    kwargs = {} if flag is None else {"prepare_for_social_media": flag}
+                    result = await upload_article_file("art-1", file, **kwargs)
+                fetch.assert_awaited_once_with(file, max_bytes=MAX_ARTICLE_FILE_BYTES)
+                upload.assert_awaited_once_with(
+                    access_token="qapp-user-token", article_id="art-1",
+                    file_name=name, file_bytes=b"original bytes", convert_to_webp=True,
+                    prepare_for_social_media=expected,
+                )
+                self.assertEqual(result["data"]["name"], name)
 
-        self.assertIs(result, expected)
-        upload.assert_awaited_once_with(
-            access_token="qapp-user-token",
-            article_id="art-1",
-            file_name="photo.png",
-            file_bytes=raw,
-            convert_to_webp=True,
-            prepare_for_social_media=True,
-        )
-
-    async def test_convert_to_webp_defaults_true_and_forwarded(self) -> None:
-        raw = b"bytes"
-        encoded = base64.b64encode(raw).decode()
-
+    async def test_unnamed_mp4_and_conversion_opt_out(self) -> None:
+        file = FileInput(file_id="file-1", download_url="https://files.oaiusercontent.com/signed")
         with (
-            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
-            patch(
-                "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
-                new=AsyncMock(return_value={}),
-            ) as upload,
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="token"),
+            patch("quollnet_mcp.tools.articles.download_file",
+                  new=AsyncMock(return_value=("upload.bin", b"video bytes", "video/mp4"))),
+            patch("quollnet_mcp.tools.articles.qapp_client.upload_article_file",
+                  new=AsyncMock(return_value={})) as upload,
         ):
-            await upload_article_file(
-                article_id="art-1",
-                file_name="img.png",
-                file_base64=encoded,
-                convert_to_webp=False,
-            )
+            await upload_article_file("art-1", file, convert_to_webp=False)
+        self.assertEqual(upload.call_args.kwargs["file_name"], "chatgpt-upload.mp4")
+        self.assertTrue(upload.call_args.kwargs["prepare_for_social_media"])
+        self.assertFalse(upload.call_args.kwargs["convert_to_webp"])
 
-        _call_kwargs = upload.call_args.kwargs
-        self.assertFalse(_call_kwargs["convert_to_webp"])
-
-    async def test_prepare_for_social_media_opt_out_forwarded(self) -> None:
-        raw = b"video bytes"
+    async def test_failed_file_download_never_uploads(self) -> None:
+        file = FileInput(file_id="file-1", download_url="https://files.oaiusercontent.com/signed")
         with (
-            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
-            patch(
-                "quollnet_mcp.tools.articles.qapp_client.upload_article_file",
-                new=AsyncMock(return_value={}),
-            ) as upload,
+            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="token"),
+            patch("quollnet_mcp.tools.articles.download_file",
+                  new=AsyncMock(side_effect=ValueError("File exceeds the configured transfer limit"))),
+            patch("quollnet_mcp.tools.articles.qapp_client.upload_article_file",
+                  new=AsyncMock()) as upload,
         ):
-            await upload_article_file(
-                article_id="art-1",
-                file_name="clip.mp4",
-                file_base64=base64.b64encode(raw).decode(),
-                prepare_for_social_media=False,
-            )
-        upload.assert_awaited_once_with(
-            access_token="qapp-user-token",
-            article_id="art-1",
-            file_name="clip.mp4",
-            file_bytes=raw,
-            convert_to_webp=True,
-            prepare_for_social_media=False,
-        )
+            with self.assertRaisesRegex(ToolError, "transfer limit"):
+                await upload_article_file("art-1", file)
+        upload.assert_not_awaited()
 
-    async def test_client_sends_preparation_flag_as_multipart_text(self) -> None:
+    async def test_client_sends_original_bytes_and_flag_as_multipart(self) -> None:
+        requests = []
+        async def respond(request):
+            requests.append(request)
+            return httpx.Response(201, json={"data": {"name": "stored"}})
         client = QAppClient(settings=SimpleNamespace())
-        for kwargs, expected in (({}, "true"),
-                                 ({"prepare_for_social_media": True}, "true"),
-                                 ({"prepare_for_social_media": False}, "false")):
-            with self.subTest(kwargs=kwargs):
-                with patch.object(client, "post_file", new=AsyncMock(return_value={})) as post:
+        async with httpx.AsyncClient(base_url="https://example.test",
+                                     transport=httpx.MockTransport(respond)) as transport:
+            client._client = transport
+            for name, flag, expected in (
+                ("clip.mp4", None, b"true"),
+                ("clip.mp4", False, b"false"),
+                ("guide.pdf", None, b"false"),
+                ("guide.pdf", True, b"false"),
+            ):
+                with self.subTest(name=name, flag=flag):
                     await client.upload_article_file(
-                        access_token="qapp-user-token",
-                        article_id="art-1",
-                        file_name="clip.mp4",
-                        file_bytes=b"video bytes",
-                        convert_to_webp=False,
-                        **kwargs,
+                        access_token="token", article_id="art-1", file_name=name,
+                        file_bytes=b"original file bytes", convert_to_webp=False,
+                        prepare_for_social_media=flag,
                     )
-                post.assert_awaited_once_with(
-                    "/articles/api/v1/articles/art-1/files",
-                    file_name="clip.mp4",
-                    file_bytes=b"video bytes",
-                    form_data={"convert-to-webp": "no", "prepare_for_social_media": expected},
-                    access_token="qapp-user-token",
-                )
+                    request = requests[-1]
+                    self.assertEqual(request.url.path, "/articles/api/v1/articles/art-1/files")
+                    self.assertEqual(request.headers["Authorization"], "Bearer token")
+                    self.assertIn("multipart/form-data", request.headers["Content-Type"])
+                    self.assertIn(b' name="file"; filename="' + name.encode() + b'"', request.content)
+                    self.assertIn(b"original file bytes", request.content)
+                    self.assertIn(b'name="prepare_for_social_media"\r\n\r\n' + expected, request.content)
+                    self.assertIn(b'name="convert-to-webp"\r\n\r\nno', request.content)
 
-    async def test_invalid_base64_raises_tool_error(self) -> None:
-        with (
-            patch("quollnet_mcp.tools.articles.qapp_user_token", return_value="qapp-user-token"),
-        ):
-            with self.assertRaises(ToolError) as ctx:
-                await upload_article_file(
-                    article_id="art-1",
-                    file_name="img.png",
-                    file_base64="!!!not-valid-base64!!!",
-                )
-        self.assertIn("base64", str(ctx.exception).lower())
+    async def test_advertised_file_reference_schema(self) -> None:
+        from app import mcp
+        registered = {tool.name: tool for tool in await mcp.list_tools()}
+        tool = registered["upload_article_file"]
+        self.assertEqual(tool.meta["openai/fileParams"], ["file"])
+        self.assertEqual(set(tool.input_schema["required"]), {"article_id", "file"})
+        self.assertNotIn("file_base64", tool.input_schema["properties"])
+        self.assertEqual(set(tool.input_schema["$defs"]["FileInput"]["required"]),
+                         {"download_url", "file_id"})
 
 
 class ListArticleFilesTests(unittest.IsolatedAsyncioTestCase):
