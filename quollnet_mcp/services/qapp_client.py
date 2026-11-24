@@ -570,13 +570,17 @@ class QAppClient:
         file_name: str,
         file_bytes: bytes,
         convert_to_webp: bool = True,
+        prepare_for_social_media: bool = True,
     ) -> Any:
-        """Upload a file to a Quollnet article's file folder."""
+        """Upload a file, optionally opting out of MP4 preparation."""
         return await self.post_file(
             f"/articles/api/v1/articles/{article_id}/files",
             file_name=file_name,
             file_bytes=file_bytes,
-            form_data={"convert-to-webp": "yes" if convert_to_webp else "no"},
+            form_data={
+                "convert-to-webp": "yes" if convert_to_webp else "no",
+                "prepare_for_social_media": "true" if prepare_for_social_media else "false",
+            },
             access_token=access_token,
         )
 
