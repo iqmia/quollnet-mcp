@@ -570,16 +570,19 @@ class QAppClient:
         file_name: str,
         file_bytes: bytes,
         convert_to_webp: bool = True,
-        prepare_for_social_media: bool = True,
+        prepare_for_social_media: bool | None = None,
     ) -> Any:
-        """Upload a file, optionally opting out of MP4 preparation."""
+        """Upload original bytes, preparing only eligible original MP4 files."""
+        name = file_name.lower()
+        eligible = name.endswith(".mp4") and not name.endswith("_quollnet.mp4")
+        prepare = eligible and prepare_for_social_media is not False
         return await self.post_file(
             f"/articles/api/v1/articles/{article_id}/files",
             file_name=file_name,
             file_bytes=file_bytes,
             form_data={
                 "convert-to-webp": "yes" if convert_to_webp else "no",
-                "prepare_for_social_media": "true" if prepare_for_social_media else "false",
+                "prepare_for_social_media": "true" if prepare else "false",
             },
             access_token=access_token,
         )
