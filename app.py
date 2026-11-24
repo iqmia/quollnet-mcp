@@ -606,7 +606,10 @@ mcp.tool(
         "WebP by qApp by default; set convert_to_webp=false when the original image "
         "format must be preserved. The returned filename and URL are authoritative "
         "because image conversion may change the filename extension. Use "
-        "list_article_files afterwards when file discovery is needed."
+        "list_article_files afterwards when file discovery is needed. Original MP4s "
+        "are queued for social media preparation by default; set "
+        "prepare_for_social_media=false to store a video as an ordinary attachment. "
+        "This flag has no effect on non-MP4 files. Uploading does not itself publish a video."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False,
